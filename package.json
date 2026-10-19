@@ -1,0 +1,14 @@
+{
+  "name": "whatsapp-luna-bot",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Minimal official Meta WhatsApp Cloud API bot powered by an OpenAI-compatible chat completion API.",
+  "main": "src/app.js",
+  "scripts": {
+    "start": "node src/app.js",
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
