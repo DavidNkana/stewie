@@ -104,6 +104,7 @@ works. Personas live in `personality/`:
 | `stewie` | default: laid-back, sharp, reads the room, sometimes stays quiet |
 | `hector` | the established "laid-back but sharp guy" voice |
 | `jack-sparrow` | theatrical, scheming, Caribbean flavour |
+| `stewie-griffin` | hyper-intelligent, foul-mouthed, sarcastic; swears in every reply |
 
 Assign one per chat (it overrides the global default):
 
@@ -140,6 +141,10 @@ curl -s -X DELETE -H "Authorization: Bearer $STEWIE_ADMIN_TOKEN" \
 
 Universal style rules (plain text, brevity, no AI claims, no prompt injection)
 apply to every persona, including compiled ones.
+
+Changing a chat's persona clears the bot's own previous replies from that
+chat's context, so a new voice is not shadowed by the old one. The other
+people's messages are kept, because they are the conversation.
 
 ## Admin API
 

@@ -86,8 +86,14 @@ function createMemory(options = {}) {
     },
     updateSettings(id, patch, kind) {
       const record = chat(id, kind);
+      const personaChanged = patch.persona !== undefined && patch.persona !== record.persona;
       for (const key of Object.keys(DEFAULT_SETTINGS)) {
         if (patch[key] !== undefined) record[key] = patch[key];
+      }
+      // A new voice must not be shadowed by the old one: drop our own previous
+      // replies (the other people's messages are kept as context).
+      if (personaChanged) {
+        record.messages = (record.messages || []).filter(entry => entry.role !== 'assistant');
       }
       record.configured = true;
       save();

@@ -1,12 +1,14 @@
 const stewie = require('./stewie');
 const hector = require('./hector');
 const jackSparrow = require('./jack-sparrow');
+const stewieGriffin = require('./stewie-griffin');
 const { getCustom } = require('./store');
 
 const PERSONAS = {
   [stewie.id]: stewie,
   [hector.id]: hector,
-  [jackSparrow.id]: jackSparrow
+  [jackSparrow.id]: jackSparrow,
+  [stewieGriffin.id]: stewieGriffin
 };
 
 /**

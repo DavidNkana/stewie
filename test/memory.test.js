@@ -76,3 +76,14 @@ test('history retention uses ingestion time, not the sender clock', () => {
   assert.ok(history[0].ts > stale);
   assert.equal(history[0].sourceTs, stale);
 });
+
+test('changing the persona clears our own prior replies but keeps the chat context', () => {
+  const memory = createMemory({ file: tempFile() });
+  memory.record('chat', { role: 'user', text: 'hi', ts: Date.now() });
+  memory.record('chat', { role: 'assistant', text: 'old voice reply', ts: Date.now() });
+  memory.record('chat', { role: 'user', text: 'more', ts: Date.now() });
+  memory.updateSettings('chat', { persona: 'stewie-griffin' });
+  const history = memory.history('chat');
+  assert.equal(history.length, 2);
+  assert.ok(history.every(entry => entry.role === 'user'));
+});
