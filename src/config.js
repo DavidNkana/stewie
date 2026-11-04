@@ -44,6 +44,8 @@ function buildConfig(env = process.env) {
     botName: env.STEWIE_BOT_NAME || DEFAULTS.botName,
     aliases: (env.STEWIE_BOT_ALIASES || '').split(',').map(item => item.trim().toLowerCase()).filter(Boolean),
     persona: env.STEWIE_PERSONA || '',
+  personaId: env.STEWIE_PERSONA_ID || 'stewie',
+  timezone: env.STEWIE_TIMEZONE || 'Africa/Lusaka',
     groupMode: env.STEWIE_GROUP_MODE || DEFAULTS.groupMode,
     dmMode: env.STEWIE_DM_MODE || DEFAULTS.dmMode,
     cooldownSeconds: int(env.STEWIE_COOLDOWN_SECONDS, DEFAULTS.cooldownSeconds),

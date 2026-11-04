@@ -110,3 +110,47 @@ test('empty model output is an error, not a silent blank reply', async () => {
   }, async () => response('   '));
   await assert.rejects(() => brain.generate({ message: { text: 'hi' }, history: [], settings: {}, kind: 'dm' }), /no text/);
 });
+
+test('a silent answer returns null instead of an empty reply', async () => {
+  const brain = createBrain({
+    model: 'MiniMax-M3',
+    modelBaseUrl: 'https://api.test/v1',
+    modelApiKey: 'k',
+    requestTimeoutMs: 5000,
+    maxReplyChars: 900,
+    botName: 'stewie',
+    personaId: 'stewie',
+    timezone: 'Africa/Lusaka'
+  }, async () => response('[SILENT]'));
+  const answer = await brain.generate({ message: { text: 'mm' }, history: [], settings: {}, kind: 'group' });
+  assert.equal(answer, null);
+});
+
+test('the prompt carries the persona, group name and speaker count', async () => {
+  let captured;
+  const brain = createBrain({
+    model: 'MiniMax-M3',
+    modelBaseUrl: 'https://api.test/v1',
+    modelApiKey: 'k',
+    requestTimeoutMs: 5000,
+    maxReplyChars: 900,
+    botName: 'stewie',
+    personaId: 'stewie',
+    timezone: 'Africa/Lusaka'
+  }, async (url, options) => {
+    captured = JSON.parse(options.body);
+    return response('ok');
+  });
+  await brain.generate({
+    message: { text: 'hi' },
+    history: [{ role: 'user', text: 'morning', name: 'David' }, { role: 'user', text: 'hey', name: 'Sarah' }],
+    settings: { persona: 'hector' },
+    chatName: 'Team Chat',
+    kind: 'group'
+  });
+  const system = captured.messages[0].content;
+  assert.match(system, /Hector/);
+  assert.match(system, /"Team Chat"/);
+  assert.match(system, /about 2 people active/);
+  assert.match(system, /\[SILENT\]/);
+});

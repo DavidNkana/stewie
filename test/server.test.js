@@ -197,3 +197,28 @@ test('an unresolvable group name is looked up once, not on every message', async
   await settle();
   assert.equal(lookups, 1);
 });
+
+test('a silent model decision sends nothing', async () => {
+  const app = build();
+  app.evolution.sendText = async () => { app.sent.push({ to: 'x', text: 'should not happen' }); };
+  const brain = { generate: async () => null };
+  const handler = createHandler({
+    config: app.config,
+    evolution: app.evolution,
+    memory: app.memory,
+    policy: createPolicy(app.config),
+    brain,
+    logger: { info() {}, warn() {}, error() {}, debug() {} }
+  });
+  await request(handler, 'POST', `/webhook/${WEBHOOK_TOKEN}`, webhookPayload('stewie hmm', { id: 'silent-1' }));
+  await settle();
+  assert.equal(app.sent.length, 0);
+});
+
+test('personas can be listed through the admin api', async () => {
+  const { handler } = build();
+  const result = await request(handler, 'GET', '/admin/personas', '', { authorization: `Bearer ${ADMIN_TOKEN}` });
+  assert.equal(result.status, 200);
+  assert.match(result.body, /stewie/);
+  assert.match(result.body, /hector/);
+});

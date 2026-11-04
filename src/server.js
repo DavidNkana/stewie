@@ -1,6 +1,7 @@
 const crypto = require('node:crypto');
 const { parseUpsert } = require('./parse');
 const { shortHash } = require('./logger');
+const { listPersonas, resolvePersona } = require('../personality');
 
 function safeEqual(a, b) {
   const left = Buffer.from(String(a || ''));
@@ -99,9 +100,15 @@ function createHandler(deps) {
 
     let reply;
     try {
-      reply = await brain.generate({ history, message, settings: { ...settings, persona: settings.persona ?? config.persona }, chatName, kind });
+      reply = await brain.generate({ history, message, settings, chatName, kind });
     } catch (error) {
       logger.error('brain_failed', { chat: shortHash(chatId), error: error.message });
+      return;
+    }
+
+    // The model may choose to stay quiet instead of replying.
+    if (!reply) {
+      logger.info('reply_suppressed', { chat: shortHash(chatId), kind, reason: 'model_stayed_silent' });
       return;
     }
 
@@ -275,6 +282,7 @@ function createHandler(deps) {
         if (!(await requireAdmin(req, res))) return undefined;
         if (req.method === 'GET' && pathname === '/admin/groups') return adminGroups(res, 'group');
         if (req.method === 'GET' && pathname === '/admin/chats') return adminGroups(res, 'dm');
+        if (req.method === 'GET' && pathname === '/admin/personas') return json(res, 200, { personas: listPersonas() });
         if (req.method === 'POST' && pathname.startsWith('/admin/groups/')) {
           return await adminUpdateGroup(req, res, decodeURIComponent(pathname.slice('/admin/groups/'.length)));
         }
