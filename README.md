@@ -143,3 +143,12 @@ This is an unofficial WhatsApp transport. Know the trade-offs before putting a p
 - No image understanding, no voice notes, no multi-language routing.
 - No per-chat knowledge base; context is the rolling chat history.
 - No outbound campaigns; Stewie only replies to inbound messages.
+
+---
+
+## Attribution notice
+
+This deployment uses **Evolution API** (https://github.com/evolution-foundation/evolution-api),
+licensed under Apache 2.0. Evolution API is being utilised as the WhatsApp transport
+for Stewie. The upstream logo and copyright information in the Evolution API console
+have not been removed or modified.

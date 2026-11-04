@@ -31,6 +31,7 @@ async function main() {
 
   server.listen(config.port, config.host, () => {
     logger.info('stewie_started', { host: config.host, port: config.port, model: config.model, instance: config.evolutionInstance });
+    logger.info('powered_by', { component: 'Evolution API', license: 'Apache-2.0', note: 'Evolution API is being utilised as the WhatsApp transport' });
   });
 
   // Point the Evolution instance at our webhook so inbound messages arrive.
