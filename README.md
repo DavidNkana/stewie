@@ -1,65 +1,145 @@
-# WhatsApp Luna Bot — validation MVP
+# Stewie
 
-Validation MVP for testing whether a fast, friendly 1:1 WhatsApp assistant creates repeat usage. It is dependency-free Node.js for the official Meta WhatsApp Cloud API, uses an OpenAI-compatible `/chat/completions` endpoint, and keeps short local conversation history. It is not production-ready.
+A WhatsApp bot for your own groups and chats, backed by the [Evolution API](https://docs.evolutionfoundation.com.br) (Baileys / WhatsApp Web transport) and an OpenAI-compatible model.
 
-## Quick start
+Stewie is a **personal tool**, not a product. It chats as your WhatsApp number, in the groups you choose, at your direction.
 
-Requires Node 18+ (built-in `fetch`). Explicitly set `MOCK_MODE=true` for the local/test path; mock mode intentionally bypasses live Meta delivery and may accept unsigned test webhooks. Live/non-mock mode fails closed unless both webhook secrets are configured.
+## How it fits together
+
+```
+WhatsApp ──► Evolution API (Baileys, holds the session) ──► webhook ──► Stewie
+                                                                      │
+                                                        Luna / MiniMax ─┘
+                                                                      │
+                                     Evolution API ──► WhatsApp ◄──────┘
+```
+
+- **Evolution API** owns the WhatsApp connection for `+27747778886`. It is installed at `/home/davai/evolution-api` and runs as the `evolution-api` systemd service on port `8080`.
+- **Stewie** (this repo) owns the behaviour: it receives inbound messages, decides whether to answer, calls the model, and sends the reply. It runs as the `stewie` systemd service on port `8099`.
+
+Because the paired number is your own, Stewie can already see every group you are in — there is no invite-link step, and no group needs to be recreated.
+
+## Behaviour
+
+Stewie replies in a chat when the policy allows it:
+
+| Mode | Replies when |
+| --- | --- |
+| `never` | never |
+| `mention` | the bot name (or an alias) appears in the message |
+| `question` | the message looks like a question, or the bot is named |
+| `always` | every message |
+
+Defaults: groups use `mention`, direct chats use `always`. Every chat can be switched off individually.
+
+Guards: per-chat cooldown, per-chat and global hourly reply caps, response probability, message de-duplication, rolling history with retention, and `STOP`/`UNSUBSCRIBE` opt-out.
+
+## Setup
 
 ```sh
 cd /home/davai/projects/stewie
-MOCK_MODE=true OPENAI_API_KEY=... WEBHOOK_VERIFY_TOKEN=choose-a-secret npm start
+cp .env.example .env    # then fill in the values
+npm test
+npm start
 ```
 
-For a live bot, set all of `WHATSAPP_ACCESS_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID`, `META_APP_SECRET`, `WEBHOOK_VERIFY_TOKEN`, and `OPENAI_API_KEY`. Keep secrets outside source control. POST webhooks with a configured app secret must include a valid Meta `X-Hub-Signature-256`; GET verification requires `hub.mode=subscribe`, the exact token, and a nonempty challenge. Live payloads must include metadata whose `phone_number_id` exactly matches the configured ID.
+### Required configuration
 
-## Meta setup
+| Variable | Purpose |
+| --- | --- |
+| `EVOLUTION_API_KEY` | Evolution REST API key (`apikey` header) |
+| `EVOLUTION_INSTANCE` | Evolution instance name (`stewie`) |
+| `STEWIE_HOST` | Bind address; default `127.0.0.1` (only Evolution needs to reach it) |
+| `STEWIE_WEBHOOK_TOKEN` | Shared path token on the webhook URL |
+| `STEWIE_ADMIN_TOKEN` | Bearer token for the admin API and QR endpoint |
+| `STEWIE_MODEL_API_KEY` | Model API key |
+| `STEWIE_MODEL_BASE_URL` | Model base URL, including the version path |
+| `STEWIE_MODEL` | Model id |
 
-1. Create a Meta developer app, add the WhatsApp product, and use a test business phone number.
-2. Create a permanent/system-user access token with permission to send WhatsApp messages; note the phone number ID.
-3. Configure the app Webhooks product with a public HTTPS callback such as `https://your-host.example/webhook`, the same verify token, and subscribe to `messages`.
-4. Subscribe the WhatsApp business account to the app and message the test number from an allowed user.
-5. Set the app secret so inbound requests are authenticated. The service acknowledges valid webhooks before model/Graph API work.
+`STEWIE_WEBHOOK_TOKEN` and `STEWIE_ADMIN_TOKEN` are compared in constant time. The webhook is the only inbound entry point and it is secret-path protected, because Evolution does not sign webhook payloads.
 
-For local development, expose port 3000 with a tunnel (for example `ngrok http 3000` or Cloudflare Tunnel) and register the HTTPS URL plus `/webhook` in Meta.
+### Model providers
 
-## Environment variables
+Any OpenAI-compatible `/chat/completions` endpoint works.
 
-| Variable | Default | Purpose |
+| Model | Base URL | Notes |
 | --- | --- | --- |
-| `PORT` | `3000` | HTTP port |
-| `WEBHOOK_VERIFY_TOKEN` | empty | Meta GET verification token |
-| `META_APP_SECRET` | empty | HMAC validation; required in live/non-mock mode |
-| `WHATSAPP_ACCESS_TOKEN` | empty | Meta Graph API bearer token |
-| `WHATSAPP_PHONE_NUMBER_ID` | empty | Sending phone number ID |
-| `GRAPH_API_VERSION` | `v23.0` | Graph API version |
-| `OPENAI_API_KEY` | empty | Model API key |
-| `OPENAI_BASE_URL` | `https://api.openai.com/v1` | OpenAI-compatible API base |
-| `OPENAI_MODEL` | `gpt-5.6-luna` | Chat model |
-| `MOCK_MODE` | `false` unless explicitly set | Test-only path: log replies instead of sending; do not use as live authentication |
-| `STATE_FILE` | `./state.json` | Local JSON state path |
-| `RETENTION_DAYS` | `7` | Bounded local retention for processed IDs, opt-outs, and conversation entries |
-| `RETRY_ATTEMPTS` | `2` | Internal model/send attempts per message |
-| `RETRY_DELAY_MS` | `25` | Delay between internal attempts |
+| `gpt-5.6-luna` | `https://api.openai.com/v1` | Reasoning family: `temperature` is omitted and `max_completion_tokens` is used automatically |
+| `MiniMax-M3` | `https://api.minimax.io/v1` | Sends `temperature`; `<think>` reasoning blocks are stripped from replies |
 
-## Useful curls
+The model variables are deliberately prefixed `STEWIE_MODEL_*` so that a global
+`OPENAI_API_KEY` in the login shell cannot silently point the bot at a different
+provider. `OPENAI_*` is still honoured as a fallback.
+
+**Current state on this box:** the OpenAI key has no credits
+(`credit_balance_exhausted`), so the service runs on `MiniMax-M3`. Restoring
+Luna is a three-line change in `.env` plus a restart.
+
+## Pairing the number
+
+1. Make sure the Evolution instance exists (`stewie`) and the service is running.
+2. Read the pairing QR:
+
+   ```sh
+   curl -s -H "Authorization: Bearer $STEWIE_ADMIN_TOKEN" \
+     http://127.0.0.1:8099/qr.png/$STEWIE_ADMIN_TOKEN -o /tmp/qr.png
+   ```
+
+3. On the phone: WhatsApp → **Settings → Linked devices → Link a device** → scan.
+4. Confirm the state flips to `open`:
+
+   ```sh
+   curl -s -H "apikey: $EVOLUTION_API_KEY" http://127.0.0.1:8080/instance/connectionState/stewie
+   ```
+
+The pairing is stored by Evolution in Postgres, so it survives restarts.
+
+## Admin API
+
+All admin routes require `Authorization: Bearer $STEWIE_ADMIN_TOKEN`.
 
 ```sh
-curl 'http://localhost:3000/health'
-curl 'http://localhost:3000/webhook?hub.mode=subscribe&hub.verify_token=choose-a-secret&hub.challenge=test'
+# list groups (including groups you have not posted in yet)
+curl -s -H "Authorization: Bearer $STEWIE_ADMIN_TOKEN" http://127.0.0.1:8099/admin/groups
+
+# switch a group on/off, or change its mode and persona
+curl -s -X POST -H "Authorization: Bearer $STEWIE_ADMIN_TOKEN" \
+  -H 'content-type: application/json' \
+  -d '{"enabled":true,"mode":"mention","persona":"dry, witty, short replies"}' \
+  http://127.0.0.1:8099/admin/groups/<group-id>
+
+# list direct chats
+curl -s -H "Authorization: Bearer $STEWIE_ADMIN_TOKEN" http://127.0.0.1:8099/admin/chats
+
+# pairing QR (PNG)
+curl -s -o /tmp/qr.png -H "Authorization: Bearer $STEWIE_ADMIN_TOKEN" http://127.0.0.1:8099/qr.png/<token>
 ```
 
-Run tests with `npm test`.
+Group ids look like `120363012345678901@g.us`. The same id is used by `GET /group/fetchAllGroups` on Evolution.
 
-## Guardrails and validation limitations
+## Operations
 
-- `STOP` and `UNSUBSCRIBE` opt a phone number out; subsequent messages are ignored. This implementation does not proactively contact users.
-- The model prompt declines sensitive-domain advice. This is a basic guardrail, not a compliance system; add review, policy, and escalation before high-stakes use.
-- State is a local JSON file intended for one small process. It contains phone numbers, message IDs, opt-out state, and short conversation history, pruned by `RETENTION_DAYS` (default 7) on load/save. Messages are sent to the configured model provider and retained locally for that period. This is a user-facing disclosure, not a claim of production privacy compliance; there is no multi-user access control, encryption, deletion workflow, or backup.
-- Only inbound individual text messages are handled. Statuses, media, reactions, and other message types are ignored.
-- Arbitrary existing WhatsApp groups are unsupported. Official WhatsApp Groups API access has eligibility, group creation, participant, and policy constraints; it is not a general way to attach a bot to any existing group. Validate current Meta documentation and eligibility before planning group workflows.
-- Per-sender ordering, bounded request/body parsing timeouts, in-flight duplicate handling, and bounded retry-safe completion are implemented for this single process. An ambiguous provider timeout can still produce duplicate external delivery because Meta has no client idempotency in this MVP. Rate limits, dead-letter handling, multi-instance locking, durable queues, and production observability are out of scope. Do not claim production readiness.
+```sh
+systemctl status evolution-api stewie
+journalctl -u stewie -f
+```
 
-## Business hypothesis and measurement
+Both services restart automatically. Stewie stores state in `data/state.json` (mode `0600`); Evolution stores the WhatsApp session in Postgres, so the pairing survives restarts.
 
-**Hypothesis:** people who receive a useful answer to their first WhatsApp question will send another question within 7 days. The validation target is repeat-user rate, not message volume. JSON events (`inbound_accepted`, `reply_success`, `model_latency`/`model_error`, `send_latency`/`send_error`, `processing_error`, and `opt_out`) contain message IDs, hashed users, attempts, errors, and latency without message contents or full phone numbers. Use them to measure activation (`reply_success`), repeat usage by hashed user, successful replies, opt-outs, failure rate, and latency; add provider token/cost data before making cost claims. This is a validation MVP: revenue model and paying customer remain unvalidated.
+## Risks and limits
+
+This is an unofficial WhatsApp transport. Know the trade-offs before putting a primary number on it:
+
+- **Ban risk.** WhatsApp bans numbers that use unofficial automation. The paired number is `+27747778886`, a primary number with existing groups. Keep the reply rate low, do not run it in unrelated groups, and be ready to re-link.
+- **The bot speaks as you.** Replies are indistinguishable from your own messages to everyone in the chat.
+- **Terms of service.** Using a non-official client violates WhatsApp's terms and is not suitable for business messaging or for a product sold to customers. It is fine for personal use.
+- **Fragility.** Baileys breaks when WhatsApp changes protocol; you own the patching.
+- **Credential exposure.** The Evolution instance holds a full WhatsApp session. `.env` and the Evolution database are secrets.
+- **Privacy.** Message text is sent to the configured model provider and stored locally for `STEWIE_RETENTION_DAYS`. Logs contain hashed ids, not message bodies.
+
+## Not built
+
+- No web UI — the admin API is the interface.
+- No image understanding, no voice notes, no multi-language routing.
+- No per-chat knowledge base; context is the rolling chat history.
+- No outbound campaigns; Stewie only replies to inbound messages.
