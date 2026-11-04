@@ -1,4 +1,5 @@
 const { resolvePersona } = require('../personality');
+const { resolveCast } = require('../personality/cast');
 
 const REASONING_MODEL = /^(gpt-5|gpt-6|o1|o3|o4)/i;
 const THINK_BLOCK = /<think>[\s\S]*?<\/think>/gi;
@@ -32,7 +33,7 @@ function timeOfDay(timezone) {
 }
 
 function buildSystemPrompt(input) {
-  const { persona, chatName, kind, botName, timezone, speakers } = input;
+  const { persona, chatName, kind, botName, timezone, speakers, cast } = input;
   const context = kind === 'group'
     ? [
       `You are in the WhatsApp group${chatName ? ` "${chatName}"` : ''}.`,
@@ -42,7 +43,7 @@ function buildSystemPrompt(input) {
     ].filter(Boolean).join(' ')
     : `You are in a private WhatsApp chat. It is ${timeOfDay(timezone)}.`;
   const identity = botName ? `People sometimes call you "${botName}".` : '';
-  return [persona.text, context, identity, RULES].filter(Boolean).join(' ');
+  return [persona.text, context, identity, cast?.rules, RULES].filter(Boolean).join(' ');
 }
 
 /**
@@ -99,12 +100,17 @@ function createBrain(config, fetchImpl = fetch) {
 
   async function generate(input) {
     const { history = [], message, settings = {}, chatName = '', kind = 'dm' } = input;
+    const cast = resolveCast({
+      speakerName: message.senderName,
+      speakerId: message.senderId,
+      text: message.text
+    });
     const model = config.model;
     const persona = resolvePersona(settings.persona || config.persona || config.personaId);
     const speakers = new Set(history.filter(entry => entry.name).map(entry => entry.name)).size;
 
     const messages = [
-      { role: 'system', content: buildSystemPrompt({ persona, chatName, kind, botName: config.botName, timezone: config.timezone, speakers }) },
+      { role: 'system', content: buildSystemPrompt({ persona, chatName, kind, botName: config.botName, timezone: config.timezone, speakers, cast }) },
       ...history.map(entry => ({
         role: entry.role === 'assistant' ? 'assistant' : 'user',
         content: entry.name && entry.role !== 'assistant' ? `${entry.name}: ${entry.text}` : entry.text
