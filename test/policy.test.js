@@ -81,3 +81,12 @@ test('probability never suppresses an explicit mention', () => {
   assert.equal(organic.reply, false);
   assert.equal(organic.reason, 'probability');
 });
+
+test('group chat questions are detected without a question mark', () => {
+  const policy = createPolicy(config, { now: () => 1000, random: () => 0 });
+  const settings = { enabled: true, mode: 'question' };
+  for (const text of ['anyone got the numbers', 'help me with this', 'can someone look at the build', 'quick one, is the site up']) {
+    assert.equal(policy.decide({ message: { isGroup: true, text }, settings }).reply, true, text);
+  }
+  assert.equal(policy.decide({ message: { isGroup: true, text: 'ok thanks' }, settings }).reason, 'not_a_question');
+});

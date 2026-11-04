@@ -310,6 +310,32 @@ function createHandler(deps) {
         if (req.method === 'GET' && pathname === '/admin/groups') return adminGroups(res, 'group');
         if (req.method === 'GET' && pathname === '/admin/chats') return adminGroups(res, 'dm');
         if (req.method === 'GET' && pathname === '/admin/personas') return json(res, 200, { personas: listPersonas() });
+        if (req.method === 'POST' && pathname === '/admin/groups/bulk') {
+          let body;
+          try {
+            const raw = await readBody(req, 32 * 1024);
+            body = raw ? JSON.parse(raw) : {};
+          } catch (error) {
+            return json(res, 400, { error: error.message });
+          }
+          const patch = {};
+          if (body.enabled !== undefined) patch.enabled = body.enabled;
+          if (body.mode !== undefined) patch.mode = body.mode;
+          if (body.persona !== undefined) patch.persona = body.persona;
+          if (body.probability !== undefined) patch.probability = body.probability;
+          if (body.mode && !['never', 'mention', 'question', 'always'].includes(body.mode)) {
+            return json(res, 400, { error: 'invalid mode' });
+          }
+          if (!Object.keys(patch).length) return json(res, 400, { error: 'nothing to change' });
+          const groups = await listGroupsWithNames();
+          let updated = 0;
+          for (const group of groups) {
+            memory.updateSettings(group.id, patch, 'group');
+            updated += 1;
+          }
+          logger.info('groups_bulk_updated', { count: updated, mode: patch.mode ?? null, enabled: patch.enabled ?? null });
+          return json(res, 200, { ok: true, updated, mode: patch.mode ?? null, enabled: patch.enabled ?? null });
+        }
         if (req.method === 'POST' && pathname === '/admin/group-by-name') {
           let body;
           try {

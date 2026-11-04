@@ -154,6 +154,12 @@ All admin routes require `Authorization: Bearer $STEWIE_ADMIN_TOKEN`.
 # list groups with names and current mode (cached, so it is instant)
 curl -s -H "Authorization: Bearer $STEWIE_ADMIN_TOKEN" http://127.0.0.1:8099/admin/groups
 
+# open every group at once (or flip them all to a different mode)
+curl -s -X POST -H "Authorization: Bearer $STEWIE_ADMIN_TOKEN" \
+  -H 'content-type: application/json' \
+  -d '{"mode":"question","enabled":true}' \
+  http://127.0.0.1:8099/admin/groups/bulk
+
 # enable a group by name, no id lookup needed
 curl -s -X POST -H "Authorization: Bearer $STEWIE_ADMIN_TOKEN" \
   -H 'content-type: application/json' \

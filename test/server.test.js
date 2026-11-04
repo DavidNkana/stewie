@@ -307,3 +307,30 @@ test('an ambiguous group name is reported instead of guessed', async () => {
   assert.equal(result.status, 409);
   assert.match(result.body, /multiple groups matched/);
 });
+
+test('all groups can be opened in one call', async () => {
+  const app = build();
+  app.evolution.fetchGroups = async () => [
+    { id: '1@g.us', subject: 'One' },
+    { id: '2@g.us', subject: 'Two' }
+  ];
+  const handler = createHandler({
+    config: app.config,
+    evolution: app.evolution,
+    memory: app.memory,
+    policy: createPolicy(app.config),
+    brain: { generate: async () => 'ok' },
+    logger: { info() {}, warn() {}, error() {}, debug() {} }
+  });
+  const result = await request(
+    handler,
+    'POST',
+    '/admin/groups/bulk',
+    JSON.stringify({ mode: 'question', enabled: true }),
+    { authorization: `Bearer ${ADMIN_TOKEN}`, 'content-type': 'application/json' }
+  );
+  assert.equal(result.status, 200);
+  assert.match(result.body, /"updated":2/);
+  const list = await request(handler, 'GET', '/admin/groups', '', { authorization: `Bearer ${ADMIN_TOKEN}` });
+  assert.match(list.body, /"mode":"question"/);
+});

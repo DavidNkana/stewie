@@ -1,4 +1,6 @@
 const QUESTION_WORDS = ['what', 'who', 'where', 'when', 'why', 'how', 'which', 'can you', 'could you', 'do you', 'did you', 'is there', 'anyone', 'anybody'];
+// Group chat rarely uses question marks, so these markers count anywhere.
+const QUESTION_MARKERS = /\b(anyone|anybody|anyone\s+else|can someone|could someone|can somebody|help|quick one|any idea|thoughts|opinions|what do you think|anyone know)\b/i;
 
 /**
  * Decides whether the bot should answer a given message.
@@ -23,7 +25,8 @@ function createPolicy(config, options = {}) {
     if (!trimmed) return false;
     if (trimmed.endsWith('?')) return true;
     const lower = trimmed.toLowerCase();
-    return QUESTION_WORDS.some(word => lower.startsWith(word));
+    if (QUESTION_WORDS.some(word => lower.startsWith(word))) return true;
+    return QUESTION_MARKERS.test(trimmed);
   }
 
   function decide(input) {
