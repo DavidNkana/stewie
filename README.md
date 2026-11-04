@@ -151,8 +151,14 @@ people's messages are kept, because they are the conversation.
 All admin routes require `Authorization: Bearer $STEWIE_ADMIN_TOKEN`.
 
 ```sh
-# list groups (including groups you have not posted in yet)
+# list groups with names and current mode (cached, so it is instant)
 curl -s -H "Authorization: Bearer $STEWIE_ADMIN_TOKEN" http://127.0.0.1:8099/admin/groups
+
+# enable a group by name, no id lookup needed
+curl -s -X POST -H "Authorization: Bearer $STEWIE_ADMIN_TOKEN" \
+  -H 'content-type: application/json' \
+  -d '{"name":"SafAi (Exec)","mode":"mention","enabled":true}' \
+  http://127.0.0.1:8099/admin/group-by-name
 
 # switch a group on/off, or change its mode and persona
 curl -s -X POST -H "Authorization: Bearer $STEWIE_ADMIN_TOKEN" \

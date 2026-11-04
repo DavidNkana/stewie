@@ -39,7 +39,22 @@ function readBody(req, limitBytes = 1024 * 1024) {
  * Admin routes require `Authorization: Bearer <STEWIE_ADMIN_TOKEN>`.
  */
 function createHandler(deps) {
-  const { config, evolution, memory, policy, brain, logger } = deps;
+  const { config, evolution, memory, policy, brain, logger, directory } = deps;
+  // Fallback for callers that do not provide a cached directory.
+  const groupDirectory = directory || {
+    list: async () => {
+      try {
+        const groups = await evolution.fetchGroups();
+        const list = Array.isArray(groups) ? groups : Array.isArray(groups?.groups) ? groups.groups : [];
+        return list
+          .map(group => ({ id: group?.id || group?.jid, name: group?.subject || group?.name || null }))
+          .filter(group => group.id);
+      } catch (error) {
+        logger.warn('group_list_failed', { error: error.message });
+        return [];
+      }
+    }
+  };
   const chains = new Map();
   // A failing send (for example while WhatsApp is unpaired) must not stall the
   // chat queue for every message, so sends are paused briefly after a failure.
@@ -188,6 +203,11 @@ function createHandler(deps) {
     return true;
   }
 
+  /** Groups known to Evolution, with their subject names, for name-based lookup. */
+  async function listGroupsWithNames() {
+    return groupDirectory.list();
+  }
+
   async function adminGroups(res, kind) {
     const merged = new Map();
     const chats = memory.chats().filter(chat => (kind ? chat.kind === kind : true));
@@ -209,11 +229,17 @@ function createHandler(deps) {
     // anyone has posted in them.
     if (kind !== 'dm') {
       try {
-        const groups = await evolution.fetchGroups();
-        const list = Array.isArray(groups) ? groups : Array.isArray(groups?.groups) ? groups.groups : [];
+        const list = await listGroupsWithNames();
         for (const group of list) {
           const id = group?.id || group?.jid;
-          if (!id || merged.has(id)) continue;
+          if (!id) continue;
+          const subject = group?.subject || group?.name || null;
+          const existing = merged.get(id);
+          if (existing) {
+            // Keep local settings, but fill in a name we have not learned yet.
+            if (!existing.name && subject) existing.name = subject;
+            continue;
+          }
           merged.set(id, {
             id,
             name: group?.subject || group?.name || null,
@@ -284,6 +310,32 @@ function createHandler(deps) {
         if (req.method === 'GET' && pathname === '/admin/groups') return adminGroups(res, 'group');
         if (req.method === 'GET' && pathname === '/admin/chats') return adminGroups(res, 'dm');
         if (req.method === 'GET' && pathname === '/admin/personas') return json(res, 200, { personas: listPersonas() });
+        if (req.method === 'POST' && pathname === '/admin/group-by-name') {
+          let body;
+          try {
+            const raw = await readBody(req, 32 * 1024);
+            body = raw ? JSON.parse(raw) : {};
+          } catch (error) {
+            return json(res, 400, { error: error.message });
+          }
+          if (!body.name) return json(res, 400, { error: 'name is required' });
+          const needle = String(body.name).toLowerCase();
+          const known = await listGroupsWithNames();
+          const matches = known.filter(group => String(group.name || '').toLowerCase().includes(needle));
+          if (!matches.length) return json(res, 404, { error: 'no group matched that name' });
+          if (matches.length > 1 && !body.exact) {
+            return json(res, 409, { error: 'multiple groups matched', matches });
+          }
+          const target = matches[0];
+          const patch = {};
+          if (body.enabled !== undefined) patch.enabled = body.enabled;
+          if (body.mode !== undefined) patch.mode = body.mode;
+          if (body.persona !== undefined) patch.persona = body.persona;
+          if (body.probability !== undefined) patch.probability = body.probability;
+          const settings = memory.updateSettings(target.id, patch, 'group');
+          logger.info('group_enabled_by_name', { chat: shortHash(target.id), name: target.name, mode: settings.mode });
+          return json(res, 200, { ok: true, group: { id: target.id, name: target.name }, settings });
+        }
         if (req.method === 'POST' && pathname === '/admin/persona') {
           let body;
           try {

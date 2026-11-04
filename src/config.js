@@ -15,6 +15,7 @@ const DEFAULTS = {
   responseProbability: 1,
   requestTimeoutMs: 20000,
   evolutionTimeoutMs: 15000,
+  groupListTimeoutMs: 90000,
   sendBackoffMs: 60000,
   maxReplyChars: 900
 };
@@ -56,9 +57,11 @@ function buildConfig(env = process.env) {
     responseProbability: Number(env.STEWIE_RESPONSE_PROBABILITY ?? DEFAULTS.responseProbability),
     requestTimeoutMs: int(env.STEWIE_REQUEST_TIMEOUT_MS, DEFAULTS.requestTimeoutMs),
     evolutionTimeoutMs: int(env.STEWIE_EVOLUTION_TIMEOUT_MS, DEFAULTS.evolutionTimeoutMs),
+    groupListTimeoutMs: int(env.STEWIE_GROUP_LIST_TIMEOUT_MS, DEFAULTS.groupListTimeoutMs),
     sendBackoffMs: int(env.STEWIE_SEND_BACKOFF_MS, DEFAULTS.sendBackoffMs),
     maxReplyChars: int(env.STEWIE_MAX_REPLY_CHARS, DEFAULTS.maxReplyChars),
     stateFile: env.STEWIE_STATE_FILE || 'data/state.json',
+    groupCacheFile: env.STEWIE_GROUP_CACHE_FILE || 'data/groups-cache.json',
     logLevel: env.STEWIE_LOG_LEVEL || 'info'
   };
 }

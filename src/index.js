@@ -7,6 +7,7 @@ const { createPolicy } = require('./policy');
 const { createBrain } = require('./brain');
 const { createEvolution } = require('./evolution');
 const { createHandler } = require('./server');
+const { createGroupDirectory } = require('./groups');
 
 async function main() {
   loadEnv();
@@ -18,7 +19,8 @@ async function main() {
   const brain = createBrain(config);
   const evolution = createEvolution(config);
 
-  const handler = createHandler({ config, evolution, memory, policy, brain, logger });
+  const directory = createGroupDirectory({ evolution, logger, cacheFile: config.groupCacheFile });
+  const handler = createHandler({ config, evolution, memory, policy, brain, logger, directory });
   const server = http.createServer((req, res) => {
     handler(req, res).catch(error => {
       logger.error('handler_crashed', { error: error.message });
@@ -52,6 +54,8 @@ async function main() {
       }
     }
   }
+
+  directory.prime();
 
   try {
     const state = await evolution.connectionState();

@@ -257,3 +257,53 @@ test('the character compiler requires a character name', async () => {
   const result = await request(handler, 'POST', '/admin/persona', JSON.stringify({}), { authorization: `Bearer ${ADMIN_TOKEN}` });
   assert.equal(result.status, 400);
 });
+
+test('a group can be enabled by name', async () => {
+  const app = build();
+  app.evolution.fetchGroups = async () => [
+    { id: '120363000000000000@g.us', subject: 'Existing Group' },
+    { id: '120363111111111111@g.us', subject: 'SafAi Exec Team' }
+  ];
+  const handler = createHandler({
+    config: app.config,
+    evolution: app.evolution,
+    memory: app.memory,
+    policy: createPolicy(app.config),
+    brain: { generate: async () => 'ok' },
+    logger: { info() {}, warn() {}, error() {}, debug() {} }
+  });
+  const result = await request(
+    handler,
+    'POST',
+    '/admin/group-by-name',
+    JSON.stringify({ name: 'safai', mode: 'mention', enabled: true }),
+    { authorization: `Bearer ${ADMIN_TOKEN}`, 'content-type': 'application/json' }
+  );
+  assert.equal(result.status, 200);
+  assert.match(result.body, /120363111111111111@g\.us/);
+});
+
+test('an ambiguous group name is reported instead of guessed', async () => {
+  const app = build();
+  app.evolution.fetchGroups = async () => [
+    { id: '1@g.us', subject: 'Team Alpha' },
+    { id: '2@g.us', subject: 'Team Beta' }
+  ];
+  const handler = createHandler({
+    config: app.config,
+    evolution: app.evolution,
+    memory: app.memory,
+    policy: createPolicy(app.config),
+    brain: { generate: async () => 'ok' },
+    logger: { info() {}, warn() {}, error() {}, debug() {} }
+  });
+  const result = await request(
+    handler,
+    'POST',
+    '/admin/group-by-name',
+    JSON.stringify({ name: 'team' }),
+    { authorization: `Bearer ${ADMIN_TOKEN}`, 'content-type': 'application/json' }
+  );
+  assert.equal(result.status, 409);
+  assert.match(result.body, /multiple groups matched/);
+});

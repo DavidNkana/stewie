@@ -6,13 +6,13 @@ function createEvolution(config, fetchImpl = fetch) {
   const base = config.evolutionBaseUrl;
   const instance = config.evolutionInstance;
 
-  async function request(path, { method = 'GET', body, query } = {}) {
+  async function request(path, { method = 'GET', body, query, timeoutMs } = {}) {
     const url = new URL(`${base}${path}`);
     for (const [key, value] of Object.entries(query || {})) {
       if (value !== undefined && value !== null) url.searchParams.set(key, String(value));
     }
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), config.evolutionTimeoutMs);
+    const timer = setTimeout(() => controller.abort(), timeoutMs || config.evolutionTimeoutMs);
     try {
       const response = await fetchImpl(url.toString(), {
         method,
@@ -44,7 +44,11 @@ function createEvolution(config, fetchImpl = fetch) {
       return request(`/message/sendText/${encodeURIComponent(instance)}`, { method: 'POST', body: { number, text } });
     },
     fetchGroups() {
-      return request(`/group/fetchAllGroups/${encodeURIComponent(instance)}`, { query: { getParticipants: false } });
+      // Enumerating every group takes tens of seconds, so it gets its own budget.
+      return request(`/group/fetchAllGroups/${encodeURIComponent(instance)}`, {
+        query: { getParticipants: false },
+        timeoutMs: config.groupListTimeoutMs
+      });
     },
     groupInfo(groupId) {
       return request(`/group/findGroupInfos/${encodeURIComponent(instance)}`, { query: { groupId } });
