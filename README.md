@@ -152,3 +152,24 @@ This deployment uses **Evolution API** (https://github.com/evolution-foundation/
 licensed under Apache 2.0. Evolution API is being utilised as the WhatsApp transport
 for Stewie. The upstream logo and copyright information in the Evolution API console
 have not been removed or modified.
+
+## Deployment notes (this box)
+
+Evolution API is deployed from source at `/home/davai/evolution-api` (tag `2.3.7`),
+running as the `evolution-api` systemd service. Two local adjustments are applied:
+
+| Change | Why | Where |
+| --- | --- | --- |
+| `SERVER_HOST=127.0.0.1` bind | keeps the Evolution REST API off the public internet | `patches/evolution-bind-loopback.patch` (applies to `src/main.ts`) |
+| iptables rule dropping external traffic to 8080 | second layer if the bind is ever reverted | `evolution-firewall.service` |
+
+Re-apply the patch after an Evolution upgrade:
+
+```sh
+cd /home/davai/evolution-api
+git apply /home/davai/projects/stewie/patches/evolution-bind-loopback.patch
+npm run build && sudo systemctl restart evolution-api
+```
+
+Stewie reads `SERVER_HOST` through Evolution's own `.env`; the WhatsApp session
+lives in Postgres, so restarts do not require re-scanning the QR.

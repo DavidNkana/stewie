@@ -35,12 +35,22 @@ async function main() {
   });
 
   // Point the Evolution instance at our webhook so inbound messages arrive.
+  // Evolution may still be booting when we start, so retry before giving up.
   const webhookUrl = `http://127.0.0.1:${config.port}/webhook/${config.webhookToken}`;
-  try {
-    await evolution.setWebhook(webhookUrl);
-    logger.info('evolution_webhook_set', { url: webhookUrl.replace(config.webhookToken, '<token>') });
-  } catch (error) {
-    logger.error('evolution_webhook_failed', { error: error.message });
+  let webhookSet = false;
+  for (let attempt = 1; attempt <= 10 && !webhookSet; attempt++) {
+    try {
+      await evolution.setWebhook(webhookUrl);
+      webhookSet = true;
+      logger.info('evolution_webhook_set', { url: webhookUrl.replace(config.webhookToken, '<token>'), attempt });
+    } catch (error) {
+      if (attempt === 10) {
+        logger.error('evolution_webhook_failed', { error: error.message, attempts: attempt });
+      } else {
+        logger.warn('evolution_webhook_retry', { attempt, error: error.message });
+        await new Promise(resolve => setTimeout(resolve, 3000));
+      }
+    }
   }
 
   try {

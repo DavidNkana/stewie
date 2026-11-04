@@ -44,7 +44,7 @@ function createEvolution(config, fetchImpl = fetch) {
       return request(`/message/sendText/${encodeURIComponent(instance)}`, { method: 'POST', body: { number, text } });
     },
     fetchGroups() {
-      return request(`/group/fetchAllGroups/${encodeURIComponent(instance)}`);
+      return request(`/group/fetchAllGroups/${encodeURIComponent(instance)}`, { query: { getParticipants: false } });
     },
     groupInfo(groupId) {
       return request(`/group/findGroupInfos/${encodeURIComponent(instance)}`, { query: { groupId } });

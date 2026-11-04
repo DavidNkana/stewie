@@ -1,0 +1,13 @@
+diff --git a/src/main.ts b/src/main.ts
+index f1f00ba..9f33072 100644
+--- a/src/main.ts
++++ b/src/main.ts
+@@ -157,7 +157,7 @@ async function bootstrap() {
+     Sentry.setupExpressErrorHandler(app);
+   }
+ 
+-  server.listen(httpServer.PORT, () => logger.log(httpServer.TYPE.toUpperCase() + ' - ON: ' + httpServer.PORT));
++  server.listen(httpServer.PORT, process.env.SERVER_HOST || '0.0.0.0', () => logger.log(httpServer.TYPE.toUpperCase() + ' - ON: ' + httpServer.PORT));
+ 
+   initWA().catch((error) => {
+     logger.error('Error loading instances: ' + error);
