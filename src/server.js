@@ -1,5 +1,5 @@
 const crypto = require('node:crypto');
-const { parseUpsert } = require('./parse');
+const { parseUpsert, extractText } = require('./parse');
 const { shortHash } = require('./logger');
 const { listPersonas, compilePersona } = require('../personality');
 const { saveCustom, deleteCustom } = require('../personality/store');
@@ -90,6 +90,46 @@ function createHandler(deps) {
     }
   }
 
+  /** Reads recent chat history from Evolution so the bot knows the context. */
+  async function fetchHistory(chatId, limit) {
+    if (!limit || limit < 1) return [];
+    try {
+      const payload = await evolution.findMessages(chatId, limit);
+      const records = Array.isArray(payload) ? payload : payload?.messages?.records || [];
+      return records
+        .map(record => {
+          const text = extractText(record.message);
+          if (!text) return null;
+          const fromMe = record.key?.fromMe === true;
+          return {
+            id: record.key?.id || '',
+            role: fromMe ? 'assistant' : 'user',
+            text: text.slice(0, 1000),
+            name: fromMe ? config.botName : record.pushName || record.participant || '',
+            ts: Number(record.messageTimestamp) * 1000 || 0
+          };
+        })
+        .filter(Boolean);
+    } catch (error) {
+      logger.warn('history_fetch_failed', { chat: shortHash(chatId), error: error.message });
+      return [];
+    }
+  }
+
+  /** Merge stored history with freshly fetched history, newest last, de-duplicated. */
+  function mergeHistory(stored, fetched, limit) {
+    const seen = new Set();
+    const merged = [];
+    for (const entry of [...stored, ...fetched]) {
+      const key = entry.id || `${entry.role}:${entry.ts}:${entry.text}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      merged.push(entry);
+    }
+    merged.sort((a, b) => (a.ts || 0) - (b.ts || 0));
+    return merged.slice(-limit);
+  }
+
   async function handleMessage(message) {
     const kind = message.isGroup ? 'group' : 'dm';
     const chatId = message.chatId;
@@ -111,7 +151,11 @@ function createHandler(deps) {
     }
 
     const chatName = message.isGroup ? await resolveGroupName(chatId) : settings.name;
-    const history = memory.history(chatId, 12, kind);
+    const contextLimit = settings.contextMessages ?? config.contextMessages;
+    const storedHistory = memory.history(chatId, 12, kind);
+    const history = contextLimit
+      ? mergeHistory(storedHistory, await fetchHistory(chatId, contextLimit), Math.max(contextLimit, 12))
+      : storedHistory;
     const started = Date.now();
 
     let reply;
@@ -268,7 +312,7 @@ function createHandler(deps) {
     } catch (error) {
       return json(res, 400, { error: error.message });
     }
-    const allowed = ['enabled', 'mode', 'persona', 'probability', 'name'];
+    const allowed = ['enabled', 'mode', 'persona', 'probability', 'name', 'contextMessages'];
     const clean = {};
     for (const key of allowed) {
       if (patch[key] !== undefined) clean[key] = patch[key];
@@ -278,6 +322,9 @@ function createHandler(deps) {
     }
     if (clean.probability !== undefined && (clean.probability < 0 || clean.probability > 1)) {
       return json(res, 400, { error: 'probability must be between 0 and 1' });
+    }
+    if (clean.contextMessages !== undefined && (clean.contextMessages < 0 || clean.contextMessages > 200)) {
+      return json(res, 400, { error: 'contextMessages must be between 0 and 200' });
     }
     const settings = memory.updateSettings(chatId, clean);
     logger.info('settings_updated', { chat: shortHash(chatId), enabled: settings.enabled, mode: settings.mode });

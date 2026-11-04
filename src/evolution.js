@@ -43,6 +43,12 @@ function createEvolution(config, fetchImpl = fetch) {
     sendText(number, text) {
       return request(`/message/sendText/${encodeURIComponent(instance)}`, { method: 'POST', body: { number, text } });
     },
+    findMessages(remoteJid, limit = 20) {
+      return request(`/chat/findMessages/${encodeURIComponent(instance)}`, {
+        method: 'POST',
+        body: { where: { key: { remoteJid } }, limit }
+      });
+    },
     fetchGroups() {
       // Enumerating every group takes tens of seconds, so it gets its own budget.
       return request(`/group/fetchAllGroups/${encodeURIComponent(instance)}`, {

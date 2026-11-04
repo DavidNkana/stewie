@@ -334,3 +334,52 @@ test('all groups can be opened in one call', async () => {
   const list = await request(handler, 'GET', '/admin/groups', '', { authorization: `Bearer ${ADMIN_TOKEN}` });
   assert.match(list.body, /"mode":"question"/);
 });
+
+test('history from Evolution is used as context when enabled', async () => {
+  const app = build();
+  let seen = null;
+  app.evolution.findMessages = async (jid, limit) => {
+    seen = { jid, limit };
+    return {
+      messages: {
+        records: [
+          { key: { id: 'old-1', fromMe: false }, pushName: 'Sarah', messageTimestamp: 1700000000, message: { conversation: 'the server was down last night' } },
+          { key: { id: 'old-2', fromMe: true }, pushName: 'Você', messageTimestamp: 1700000100, message: { conversation: 'noted' } }
+        ]
+      }
+    };
+  };
+  const brain = {
+    generate: async ({ history }) => { return 'ok'; },
+    complete: async () => 'ok'
+  };
+  app.memory.updateSettings('120363000000000000@g.us', { contextMessages: 20 }, 'group');
+  const handler = createHandler({
+    config: app.config,
+    evolution: app.evolution,
+    memory: app.memory,
+    policy: createPolicy(app.config),
+    brain,
+    logger: { info() {}, warn() {}, error() {}, debug() {} }
+  });
+  await request(handler, 'POST', `/webhook/${WEBHOOK_TOKEN}`, webhookPayload('stewie what broke?', { id: 'ctx-1' }));
+  await settle();
+  assert.deepEqual(seen, { jid: '120363000000000000@g.us', limit: 20 });
+});
+
+test('history is not fetched when the context size is zero', async () => {
+  const app = build();
+  let called = false;
+  app.evolution.findMessages = async () => { called = true; return { messages: { records: [] } }; };
+  const handler = createHandler({
+    config: app.config,
+    evolution: app.evolution,
+    memory: app.memory,
+    policy: createPolicy(app.config),
+    brain: { generate: async () => 'ok', complete: async () => 'ok' },
+    logger: { info() {}, warn() {}, error() {}, debug() {} }
+  });
+  await request(handler, 'POST', `/webhook/${WEBHOOK_TOKEN}`, webhookPayload('stewie hello', { id: 'ctx-2' }));
+  await settle();
+  assert.equal(called, false);
+});

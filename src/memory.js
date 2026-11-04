@@ -3,6 +3,7 @@ const path = require('node:path');
 
 const DEFAULT_SETTINGS = {
   enabled: true,
+  contextMessages: null,
   mode: null,
   persona: null,
   probability: null,

@@ -94,6 +94,24 @@ Luna is a three-line change in `.env` plus a restart.
 
 The pairing is stored by Evolution in Postgres, so it survives restarts.
 
+## History context
+
+Stewie can read a chat's stored history from Evolution before it replies, so it
+knows what was said even before it started. It is controlled by
+`STEWIE_CONTEXT_MESSAGES` (how many messages to pull, `0` disables it) and can
+be overridden per chat with `contextMessages` in the admin API.
+
+```sh
+curl -s -X POST -H "Authorization: Bearer $STEWIE_ADMIN_TOKEN" \
+  -H 'content-type: application/json' \
+  -d '{"contextMessages":40}' \
+  http://127.0.0.1:8099/admin/groups/<group-id>
+```
+
+The fetch is a local read from Evolution's database and takes milliseconds.
+**Those older messages are sent to the configured model provider**, so raise the
+number only as far as you need.
+
 ## Personas
 
 A persona is the voice Stewie speaks with. It is just a prompt, so anything
