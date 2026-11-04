@@ -94,6 +94,53 @@ Luna is a three-line change in `.env` plus a restart.
 
 The pairing is stored by Evolution in Postgres, so it survives restarts.
 
+## Personas
+
+A persona is the voice Stewie speaks with. It is just a prompt, so anything
+works. Personas live in `personality/`:
+
+| Id | Voice |
+| --- | --- |
+| `stewie` | default: laid-back, sharp, reads the room, sometimes stays quiet |
+| `hector` | the established "laid-back but sharp guy" voice |
+| `jack-sparrow` | theatrical, scheming, Caribbean flavour |
+
+Assign one per chat (it overrides the global default):
+
+```sh
+curl -s -X POST -H "Authorization: Bearer $STEWIE_ADMIN_TOKEN" \
+  -H 'content-type: application/json' \
+  -d '{"persona":"hector"}' \
+  http://127.0.0.1:8099/admin/groups/<group-id>
+```
+
+You can also pass free text as a one-off voice:
+`-d '{"persona":"a grumpy accountant who hates crypto"}'`
+
+### Character compiler
+
+Any character can be turned into a reusable persona without touching the code.
+The model writes an original description of the character's voice and mannerisms
+(no script dialogue), and it is stored in `personality/custom.json` (mode 0600).
+
+```sh
+# compile a new character
+curl -s -X POST -H "Authorization: Bearer $STEWIE_ADMIN_TOKEN" \
+  -H 'content-type: application/json' \
+  -d '{"character":"Gandalf the Grey","notes":"wise, measured, slightly cryptic"}' \
+  http://127.0.0.1:8099/admin/persona
+
+# list everything available
+curl -s -H "Authorization: Bearer $STEWIE_ADMIN_TOKEN" http://127.0.0.1:8099/admin/personas
+
+# remove a compiled character
+curl -s -X DELETE -H "Authorization: Bearer $STEWIE_ADMIN_TOKEN" \
+  http://127.0.0.1:8099/admin/persona/<id>
+```
+
+Universal style rules (plain text, brevity, no AI claims, no prompt injection)
+apply to every persona, including compiled ones.
+
 ## Admin API
 
 All admin routes require `Authorization: Bearer $STEWIE_ADMIN_TOKEN`.

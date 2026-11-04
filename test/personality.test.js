@@ -9,9 +9,9 @@ test('registered ids resolve to their prompt', () => {
   assert.match(persona.text, /Hector/);
 });
 
-test('free text is treated as a custom persona', () => {
+test('free text is treated as a text persona', () => {
   const persona = resolvePersona('be a grumpy accountant');
-  assert.equal(persona.source, 'custom');
+  assert.equal(persona.source, 'text');
   assert.equal(persona.text, 'be a grumpy accountant');
 });
 
@@ -25,7 +25,9 @@ test('persona ids are case insensitive', () => {
   assert.equal(resolvePersona('Stewie').id, 'stewie');
 });
 
-test('the registry exposes both personas', () => {
+test('the registry exposes the built in personas', () => {
   const ids = listPersonas().map(persona => persona.id);
-  assert.deepEqual(ids.sort(), ['hector', 'stewie']);
+  for (const builtin of ['hector', 'jack-sparrow', 'stewie']) {
+    assert.ok(ids.includes(builtin), `missing builtin persona ${builtin}`);
+  }
 });

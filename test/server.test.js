@@ -222,3 +222,38 @@ test('personas can be listed through the admin api', async () => {
   assert.match(result.body, /stewie/);
   assert.match(result.body, /hector/);
 });
+
+test('a character can be compiled into a persona through the admin api', async () => {
+  const app = build();
+  const brain = {
+    generate: async () => 'ok',
+    complete: async () => 'You are a calm and deliberate character.'
+  };
+  const handler = createHandler({
+    config: app.config,
+    evolution: app.evolution,
+    memory: app.memory,
+    policy: createPolicy(app.config),
+    brain,
+    logger: { info() {}, warn() {}, error() {}, debug() {} }
+  });
+  const result = await request(
+    handler,
+    'POST',
+    '/admin/persona',
+    JSON.stringify({ character: 'Testy McTestface', notes: 'cheerful' }),
+    { authorization: `Bearer ${ADMIN_TOKEN}`, 'content-type': 'application/json' }
+  );
+  assert.equal(result.status, 200);
+  assert.match(result.body, /testy-mctestface/);
+  const list = await request(handler, 'GET', '/admin/personas', '', { authorization: `Bearer ${ADMIN_TOKEN}` });
+  assert.match(list.body, /testy-mctestface/);
+  const cleanup = await request(handler, 'DELETE', '/admin/persona/testy-mctestface', '', { authorization: `Bearer ${ADMIN_TOKEN}` });
+  assert.equal(cleanup.status, 200);
+});
+
+test('the character compiler requires a character name', async () => {
+  const { handler } = build();
+  const result = await request(handler, 'POST', '/admin/persona', JSON.stringify({}), { authorization: `Bearer ${ADMIN_TOKEN}` });
+  assert.equal(result.status, 400);
+});

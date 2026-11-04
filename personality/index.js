@@ -1,11 +1,18 @@
 const stewie = require('./stewie');
 const hector = require('./hector');
+const jackSparrow = require('./jack-sparrow');
+const { getCustom } = require('./store');
 
-const PERSONAS = { [stewie.id]: stewie, [hector.id]: hector };
+const PERSONAS = {
+  [stewie.id]: stewie,
+  [hector.id]: hector,
+  [jackSparrow.id]: jackSparrow
+};
 
 /**
  * Resolves a persona reference into prompt text.
- * Accepts a registered id ("stewie", "hector"), free text, or null.
+ * Accepts a registered id ("stewie", "hector", "jack-sparrow"), a custom id
+ * created with the character compiler, free text, or null.
  * Free text wins so a chat can be given a one-off voice.
  */
 function resolvePersona(value, fallbackId = 'stewie') {
@@ -13,18 +20,25 @@ function resolvePersona(value, fallbackId = 'stewie') {
     const trimmed = value.trim();
     const known = PERSONAS[trimmed.toLowerCase()];
     if (known) return { id: known.id, name: known.name, text: known.prompt, source: 'registry' };
-    return { id: null, name: null, text: trimmed, source: 'custom' };
+    const custom = getCustom(trimmed);
+    if (custom) return { id: custom.id, name: custom.name, text: custom.prompt, source: 'custom' };
+    return { id: null, name: null, text: trimmed, source: 'text' };
   }
   const fallback = PERSONAS[fallbackId] || PERSONAS.stewie;
   return { id: fallback.id, name: fallback.name, text: fallback.prompt, source: 'default' };
 }
 
 function listPersonas() {
-  return Object.values(PERSONAS).map(persona => ({
+  const builtins = Object.values(PERSONAS).map(persona => ({
     id: persona.id,
     name: persona.name,
-    prompt: persona.prompt
+    prompt: persona.prompt,
+    source: 'registry'
   }));
+  const customs = require('./store').listCustom().map(persona => ({ ...persona, source: 'custom' }));
+  return [...builtins, ...customs];
 }
 
-module.exports = { PERSONAS, resolvePersona, listPersonas };
+const { compilePersona } = require('./compiler');
+
+module.exports = { PERSONAS, resolvePersona, listPersonas, compilePersona };

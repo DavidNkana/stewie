@@ -1,7 +1,8 @@
 const crypto = require('node:crypto');
 const { parseUpsert } = require('./parse');
 const { shortHash } = require('./logger');
-const { listPersonas, resolvePersona } = require('../personality');
+const { listPersonas, compilePersona } = require('../personality');
+const { saveCustom, deleteCustom } = require('../personality/store');
 
 function safeEqual(a, b) {
   const left = Buffer.from(String(a || ''));
@@ -283,6 +284,34 @@ function createHandler(deps) {
         if (req.method === 'GET' && pathname === '/admin/groups') return adminGroups(res, 'group');
         if (req.method === 'GET' && pathname === '/admin/chats') return adminGroups(res, 'dm');
         if (req.method === 'GET' && pathname === '/admin/personas') return json(res, 200, { personas: listPersonas() });
+        if (req.method === 'POST' && pathname === '/admin/persona') {
+          let body;
+          try {
+            const raw = await readBody(req, 32 * 1024);
+            body = raw ? JSON.parse(raw) : {};
+          } catch (error) {
+            return json(res, 400, { error: error.message });
+          }
+          if (!body.character) return json(res, 400, { error: 'character is required' });
+          try {
+            const compiled = await compilePersona({
+              character: body.character,
+              notes: body.notes,
+              complete: args => brain.complete(args)
+            });
+            const saved = saveCustom(compiled);
+            logger.info('persona_compiled', { id: saved.id, name: saved.name });
+            return json(res, 200, { ok: true, persona: saved });
+          } catch (error) {
+            logger.error('persona_compile_failed', { error: error.message });
+            return json(res, 502, { error: error.message });
+          }
+        }
+        if (req.method === 'DELETE' && pathname.startsWith('/admin/persona/')) {
+          const id = decodeURIComponent(pathname.slice('/admin/persona/'.length));
+          const removed = deleteCustom(id);
+          return json(res, removed ? 200 : 404, { ok: removed });
+        }
         if (req.method === 'POST' && pathname.startsWith('/admin/groups/')) {
           return await adminUpdateGroup(req, res, decodeURIComponent(pathname.slice('/admin/groups/'.length)));
         }
