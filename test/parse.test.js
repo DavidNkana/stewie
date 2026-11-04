@@ -74,3 +74,37 @@ test('jid helpers classify groups, dms and unknown ids', () => {
   assert.equal(isDirect('277@s.whatsapp.net'), true);
   assert.equal(isDirect('120363@g.us'), false);
 });
+
+test('accepts the dotted event name Evolution actually sends', () => {
+  const [message] = parseUpsert({
+    event: 'messages.upsert',
+    instance: 'stewie',
+    data: {
+      key: { remoteJid: '120363000000000000@g.us', fromMe: false, id: '3EB02', participant: '27747778886@s.whatsapp.net' },
+      pushName: 'David Nkana',
+      message: { conversation: 'stewie whats up?' },
+      messageTimestamp: 1793790334
+    }
+  });
+  assert.equal(message.text, 'stewie whats up?');
+  assert.equal(message.isGroup, true);
+});
+
+test('still accepts the upper-case event name', () => {
+  const [message] = parseUpsert(upsert({
+    key: { remoteJid: '27747778886@s.whatsapp.net', fromMe: false, id: 'x' },
+    message: { conversation: 'hello' }
+  }));
+  assert.equal(message.text, 'hello');
+});
+
+test('normalizes event names consistently', () => {
+  assert.equal(require('../src/parse').normalizeEvent('messages.upsert'), 'MESSAGES_UPSERT');
+  assert.equal(require('../src/parse').normalizeEvent('MESSAGES_UPSERT'), 'MESSAGES_UPSERT');
+  assert.equal(require('../src/parse').normalizeEvent('connection.update'), 'CONNECTION_UPDATE');
+});
+
+test('ignores other Evolution events', () => {
+  assert.deepEqual(parseUpsert({ event: 'connection.update', data: { key: { remoteJid: '1@s.whatsapp.net' } } }), []);
+  assert.deepEqual(parseUpsert({ event: 'send.message', data: { key: { remoteJid: '1@s.whatsapp.net' } } }), []);
+});

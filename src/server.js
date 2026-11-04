@@ -138,6 +138,14 @@ function createHandler(deps) {
     }
     json(res, 200, { ok: true });
     const messages = parseUpsert(payload);
+    // Log every inbound envelope so a delivery that fails to parse is visible
+    // instead of silently dropping the message.
+    logger.info('webhook_received', {
+      event: typeof payload?.event === 'string' ? payload.event : 'unknown',
+      instance: typeof payload?.instance === 'string' ? payload.instance : 'unknown',
+      parsed: messages.length,
+      keys: Object.keys(payload || {}).join(',')
+    });
     for (const message of messages) {
       if (message.messageId && memory.isProcessed(message.messageId)) continue;
       if (message.messageId) memory.markProcessed(message.messageId);

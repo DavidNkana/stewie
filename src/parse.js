@@ -41,14 +41,23 @@ function extractText(message) {
 }
 
 /**
+ * Evolution sends the raw event name in the payload (for example
+ * "messages.upsert" or "connection.update") while the webhook subscription
+ * filter uses the upper-cased form ("MESSAGES_UPSERT"). Normalise both sides
+ * so an event is never silently dropped because of naming.
+ */
+function normalizeEvent(value) {
+  return String(value || '').replace(/[^a-z0-9]/gi, '_').toUpperCase();
+}
+
+/**
  * Returns an array of normalized inbound messages.
  * Non-text messages, status updates and our own outbound messages are dropped.
  */
 function parseUpsert(payload) {
   const results = [];
   if (!payload || typeof payload !== 'object') return results;
-  const event = payload.event;
-  if (event !== 'MESSAGES_UPSERT') return results;
+  if (normalizeEvent(payload.event) !== 'MESSAGES_UPSERT') return results;
 
   const data = payload.data;
   if (!data || typeof data !== 'object') return results;
@@ -86,4 +95,4 @@ function parseUpsert(payload) {
   return results;
 }
 
-module.exports = { parseUpsert, extractText, isGroup, isDirect, GROUP_SUFFIX, USER_SUFFIX };
+module.exports = { parseUpsert, extractText, isGroup, isDirect, normalizeEvent, GROUP_SUFFIX, USER_SUFFIX };
