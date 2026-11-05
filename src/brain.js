@@ -54,12 +54,12 @@ function buildSystemPrompt(input) {
  */
 function createBrain(config, fetchImpl = fetch) {
   /** Raw OpenAI-compatible chat completion. Returns text or null. */
-  async function chatCompletion(messages) {
+  async function chatCompletion(messages, { maxTokens = 400 } = {}) {
     const body = { model: config.model, messages };
     if (REASONING_MODEL.test(config.model)) {
-      body.max_completion_tokens = 400;
+      body.max_completion_tokens = maxTokens;
     } else {
-      body.max_tokens = 400;
+      body.max_tokens = maxTokens;
       body.temperature = 0.8;
     }
 
@@ -94,7 +94,7 @@ function createBrain(config, fetchImpl = fetch) {
     const answer = await chatCompletion([
       { role: 'system', content: system },
       { role: 'user', content: user }
-    ]);
+    ], { maxTokens: 1500 });
     return answer.slice(0, 2000);
   }
 
