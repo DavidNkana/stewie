@@ -54,9 +54,10 @@ function createGroupDirectory(options) {
   }
 
   async function list({ force = false } = {}) {
+    if (force) return refresh();
     const fresh = Date.now() - cache.fetchedAt < ttlMs;
-    if (!force && cache.groups.length && fresh) return cache.groups;
     if (!cache.groups.length) return refresh();
+    if (fresh) return cache.groups;
     // Serve the stale list immediately, refresh in the background.
     refresh();
     return cache.groups;

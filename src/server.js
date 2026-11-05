@@ -374,7 +374,9 @@ function createHandler(deps) {
             return json(res, 400, { error: 'invalid mode' });
           }
           if (!Object.keys(patch).length) return json(res, 400, { error: 'nothing to change' });
-          const groups = await listGroupsWithNames();
+          // Always refresh first: acting on a cached list could target groups
+          // this account is no longer in.
+          const groups = await listGroupsWithNames({ force: true });
           let updated = 0;
           for (const group of groups) {
             memory.updateSettings(group.id, patch, 'group');

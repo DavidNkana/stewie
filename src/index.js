@@ -57,6 +57,29 @@ async function main() {
 
   directory.prime();
 
+  // The webhook lives on the Evolution instance. If the instance is replaced
+  // or recreated, the webhook silently disappears and no messages arrive, so
+  // keep verifying it and re-registering when needed.
+  async function ensureWebhook(reason) {
+    try {
+      const current = await evolution.getWebhook();
+      const url = `http://127.0.0.1:${config.port}/webhook/${config.webhookToken}`;
+      const wanted = ['MESSAGES_UPSERT', 'CONNECTION_UPDATE'];
+      const ok = current && current.enabled && current.url === url
+        && Array.isArray(current.events) && wanted.every(event => current.events.includes(event));
+      if (ok) return true;
+      await evolution.setWebhook(url, wanted);
+      logger.info('evolution_webhook_repaired', { reason, url: url.replace(config.webhookToken, '<token>') });
+      return true;
+    } catch (error) {
+      logger.warn('evolution_webhook_check_failed', { reason, error: error.message });
+      return false;
+    }
+  }
+
+  const webhookTimer = setInterval(() => ensureWebhook('periodic'), 120000);
+  webhookTimer.unref();
+
   try {
     const state = await evolution.connectionState();
     logger.info('evolution_connection', { state: state?.instance?.state ?? state?.state ?? 'unknown' });
@@ -66,6 +89,7 @@ async function main() {
 
   const shutdown = signal => {
     logger.info('shutting_down', { signal });
+    clearInterval(webhookTimer);
     server.close(() => process.exit(0));
     setTimeout(() => process.exit(0), 8000).unref();
   };

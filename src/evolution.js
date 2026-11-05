@@ -65,6 +65,9 @@ function createEvolution(config, fetchImpl = fetch) {
     connectionState() {
       return request(`/instance/connectionState/${encodeURIComponent(instance)}`);
     },
+    getWebhook() {
+      return request(`/webhook/find/${encodeURIComponent(instance)}`);
+    },
     setWebhook(url, events = ['MESSAGES_UPSERT', 'CONNECTION_UPDATE']) {
       return request(`/webhook/set/${encodeURIComponent(instance)}`, {
         method: 'POST',
