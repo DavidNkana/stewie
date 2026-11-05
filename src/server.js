@@ -1,7 +1,7 @@
 const crypto = require('node:crypto');
 const { parseUpsert, extractText } = require('./parse');
 const { shortHash } = require('./logger');
-const { listPersonas, compilePersona } = require('../personality');
+const { listPersonas, compilePersona, resolvePersona } = require('../personality');
 const { saveCustom, deleteCustom } = require('../personality/store');
 
 function safeEqual(a, b) {
@@ -128,6 +128,55 @@ function createHandler(deps) {
     }
     merged.sort((a, b) => (a.ts || 0) - (b.ts || 0));
     return merged.slice(-limit);
+  }
+
+  /** Finds a participant's JID in a chat by matching their display name. */
+  async function resolveParticipant(chatId, name) {
+    const needle = String(name || '').toLowerCase().trim();
+    if (!needle) return null;
+    try {
+      const payload = await evolution.findMessages(chatId, 100);
+      const records = Array.isArray(payload) ? payload : payload?.messages?.records || [];
+      let best = null;
+      for (const record of records) {
+        const label = String(record.pushName || '').toLowerCase();
+        const participant = record.key?.participant || record.participant;
+        if (!participant || !label) continue;
+        if (label.includes(needle) || needle.includes(label)) {
+          if (!best || (record.messageTimestamp || 0) > (best.ts || 0)) {
+            best = { participant, name: record.pushName, ts: record.messageTimestamp || 0 };
+          }
+        }
+      }
+      return best;
+    } catch (error) {
+      logger.warn('participant_resolve_failed', { chat: shortHash(chatId), error: error.message });
+      return null;
+    }
+  }
+
+  /**
+   * Resolves a chat id from an id or a group name.
+   * An exact name match always wins, so "SafAi" never resolves to
+   * "SafAi hospitalities". Ambiguous partial matches are reported instead of
+   * being guessed.
+   */
+  async function resolveChat(reference) {
+    const value = String(reference || '').trim();
+    if (!value) return { id: null, matches: [] };
+    if (value.endsWith('@g.us') || value.endsWith('@s.whatsapp.net')) return { id: value, matches: [] };
+    const groups = await listGroupsWithNames();
+    const needle = value.toLowerCase();
+    const exact = groups.find(group => String(group.name || '').trim().toLowerCase() === needle);
+    if (exact) return { id: exact.id, matches: [exact] };
+    const matches = groups.filter(group => String(group.name || '').toLowerCase().includes(needle));
+    if (matches.length === 1) return { id: matches[0].id, matches };
+    return { id: null, matches };
+  }
+
+  async function resolveChatId(reference) {
+    const resolved = await resolveChat(reference);
+    return resolved.id;
   }
 
   async function handleMessage(message) {
@@ -357,6 +406,47 @@ function createHandler(deps) {
         if (req.method === 'GET' && pathname === '/admin/groups') return adminGroups(res, 'group');
         if (req.method === 'GET' && pathname === '/admin/chats') return adminGroups(res, 'dm');
         if (req.method === 'GET' && pathname === '/admin/personas') return json(res, 200, { personas: listPersonas() });
+        if (req.method === 'POST' && pathname === '/admin/roast') {
+          let body;
+          try {
+            const raw = await readBody(req, 64 * 1024);
+            body = raw ? JSON.parse(raw) : {};
+          } catch (error) {
+            return json(res, 400, { error: error.message });
+          }
+          if (!body.chat) return json(res, 400, { error: 'chat is required' });
+          if (!body.target) return json(res, 400, { error: 'target is required' });
+          const resolvedChat = await resolveChat(body.chat);
+          if (!resolvedChat.id) {
+            if (resolvedChat.matches.length > 1) {
+              return json(res, 409, { error: 'multiple chats matched', matches: resolvedChat.matches });
+            }
+            return json(res, 404, { error: 'no chat matched that reference' });
+          }
+          const chatId = resolvedChat.id;
+          const participant = await resolveParticipant(chatId, body.target);
+          const persona = resolvePersona(body.persona || config.persona || config.personaId);
+          const instruction = [
+            `Write a short, funny, savage message for ${body.target} in the WhatsApp group "${body.chat}".`,
+            body.note ? `The joke you must land: ${body.note}` : 'Make it as cutting and funny as you can.',
+            'Address them by name. Keep it to one or two sentences. Plain text, no markdown.',
+            'Roast their behaviour and choices, never their race, religion, family, health or nationality. Keep it verbal banter, no threats and no private information.',
+            'Output only the message text.'
+          ].join(' ');
+          try {
+            const text = await brain.complete({
+              system: `${persona.text}\n\n${instruction}`,
+              user: 'Write it.'
+            });
+            const options = participant ? { mentioned: [participant.participant] } : undefined;
+            await evolution.sendText(chatId, text, options);
+            logger.info('roast_sent', { chat: shortHash(chatId), target: body.target, mentioned: Boolean(participant) });
+            return json(res, 200, { ok: true, chat: chatId, target: body.target, mentioned: participant?.participant ?? null, text });
+          } catch (error) {
+            logger.error('roast_failed', { error: error.message });
+            return json(res, 502, { error: error.message });
+          }
+        }
         if (req.method === 'POST' && pathname === '/admin/groups/bulk') {
           let body;
           try {

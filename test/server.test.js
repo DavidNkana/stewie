@@ -383,3 +383,89 @@ test('history is not fetched when the context size is zero', async () => {
   await settle();
   assert.equal(called, false);
 });
+
+test('a roast is generated for a target and mentions them', async () => {
+  const app = build();
+  const sent = [];
+  app.evolution.sendText = async (to, text, options) => { sent.push({ to, text, options }); };
+  app.evolution.findMessages = async () => ({
+    messages: {
+      records: [
+        { key: { id: 'm1', participant: '111@lid', remoteJid: '120363000000000000@g.us' }, pushName: 'Woody', messageTimestamp: 1000, message: { conversation: 'hi' } }
+      ]
+    }
+  });
+  app.evolution.fetchGroups = async () => [{ id: '120363000000000000@g.us', subject: 'SafAi' }];
+  const handler = createHandler({
+    config: app.config,
+    evolution: app.evolution,
+    memory: app.memory,
+    policy: createPolicy(app.config),
+    brain: { generate: async () => 'ok', complete: async () => 'Woody, you absolute legend.' },
+    logger: { info() {}, warn() {}, error() {}, debug() {} }
+  });
+  const result = await request(
+    handler,
+    'POST',
+    '/admin/roast',
+    JSON.stringify({ chat: 'SafAi', target: 'Woody', note: 'he lurks' }),
+    { authorization: `Bearer ${ADMIN_TOKEN}`, 'content-type': 'application/json' }
+  );
+  assert.equal(result.status, 200);
+  assert.equal(sent.length, 1);
+  assert.equal(sent[0].to, '120363000000000000@g.us');
+  assert.deepEqual(sent[0].options, { mentioned: ['111@lid'] });
+});
+
+test('an exact group name wins over a partial match', async () => {
+  const app = build();
+  const sent = [];
+  app.evolution.sendText = async (to, text, options) => { sent.push({ to, text, options }); };
+  app.evolution.fetchGroups = async () => [
+    { id: 'hospitality@g.us', subject: 'SafAi hospitalities' },
+    { id: 'exact@g.us', subject: 'SafAi' },
+    { id: 'finance@g.us', subject: 'SafAi Finance' }
+  ];
+  app.evolution.findMessages = async () => ({ messages: { records: [] } });
+  const handler = createHandler({
+    config: app.config,
+    evolution: app.evolution,
+    memory: app.memory,
+    policy: createPolicy(app.config),
+    brain: { generate: async () => 'ok', complete: async () => 'Woody, eat shit.' },
+    logger: { info() {}, warn() {}, error() {}, debug() {} }
+  });
+  const result = await request(
+    handler,
+    'POST',
+    '/admin/roast',
+    JSON.stringify({ chat: 'SafAi', target: 'Woody' }),
+    { authorization: `Bearer ${ADMIN_TOKEN}`, 'content-type': 'application/json' }
+  );
+  assert.equal(result.status, 200);
+  assert.equal(sent[0].to, 'exact@g.us');
+});
+
+test('an ambiguous partial group name is reported, not guessed', async () => {
+  const app = build();
+  app.evolution.fetchGroups = async () => [
+    { id: 'a@g.us', subject: 'Team Alpha' },
+    { id: 'b@g.us', subject: 'Team Beta' }
+  ];
+  const handler = createHandler({
+    config: app.config,
+    evolution: app.evolution,
+    memory: app.memory,
+    policy: createPolicy(app.config),
+    brain: { generate: async () => 'ok', complete: async () => 'x' },
+    logger: { info() {}, warn() {}, error() {}, debug() {} }
+  });
+  const result = await request(
+    handler,
+    'POST',
+    '/admin/roast',
+    JSON.stringify({ chat: 'Team', target: 'Woody' }),
+    { authorization: `Bearer ${ADMIN_TOKEN}`, 'content-type': 'application/json' }
+  );
+  assert.equal(result.status, 409);
+});

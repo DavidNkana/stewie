@@ -40,8 +40,11 @@ function createEvolution(config, fetchImpl = fetch) {
 
   return {
     request,
-    sendText(number, text) {
-      return request(`/message/sendText/${encodeURIComponent(instance)}`, { method: 'POST', body: { number, text } });
+    sendText(number, text, options) {
+      return request(`/message/sendText/${encodeURIComponent(instance)}`, {
+        method: 'POST',
+        body: { number, text, ...(options || {}) }
+      });
     },
     findMessages(remoteJid, limit = 20) {
       return request(`/chat/findMessages/${encodeURIComponent(instance)}`, {
