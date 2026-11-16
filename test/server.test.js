@@ -40,7 +40,7 @@ function build({ reply = 'sure thing' } = {}) {
     buildMessages: () => [{ role: 'user', content: 'test' }],
     chat: async () => ({ content: reply, toolCalls: [] })
   };
-  const tools = { schemas: [], execute: async () => ({ ok: true, result: null }), has: () => false };
+  const tools = { schemas: [], selectSchemas: () => [], execute: async () => ({ ok: true, result: null }), has: () => false };
   const policy = createPolicy(config);
   const logger = { info() {}, warn() {}, error() {}, debug() {} };
   const handler = createHandler({ config, evolution, memory, policy, brain, tools, logger });
@@ -285,7 +285,7 @@ test('a group can be enabled by name', async () => {
     memory: app.memory,
     policy: createPolicy(app.config),
     brain: { generate: async () => 'ok', complete: async () => 'ok', buildMessages: () => [{ role: 'user', content: 'x' }], chat: async () => ({ content: 'ok', toolCalls: [] }) },
-    tools: { schemas: [], execute: async () => ({ ok: true, result: null }), has: () => false },
+    tools: { schemas: [], selectSchemas: () => [], execute: async () => ({ ok: true, result: null }), has: () => false },
     logger: { info() {}, warn() {}, error() {}, debug() {} }
   });
   const result = await request(
@@ -311,7 +311,7 @@ test('an ambiguous group name is reported instead of guessed', async () => {
     memory: app.memory,
     policy: createPolicy(app.config),
     brain: { generate: async () => 'ok', complete: async () => 'ok', buildMessages: () => [{ role: 'user', content: 'x' }], chat: async () => ({ content: 'ok', toolCalls: [] }) },
-    tools: { schemas: [], execute: async () => ({ ok: true, result: null }), has: () => false },
+    tools: { schemas: [], selectSchemas: () => [], execute: async () => ({ ok: true, result: null }), has: () => false },
     logger: { info() {}, warn() {}, error() {}, debug() {} }
   });
   const result = await request(
@@ -337,7 +337,7 @@ test('all groups can be opened in one call', async () => {
     memory: app.memory,
     policy: createPolicy(app.config),
     brain: { generate: async () => 'ok', complete: async () => 'ok', buildMessages: () => [{ role: 'user', content: 'x' }], chat: async () => ({ content: 'ok', toolCalls: [] }) },
-    tools: { schemas: [], execute: async () => ({ ok: true, result: null }), has: () => false },
+    tools: { schemas: [], selectSchemas: () => [], execute: async () => ({ ok: true, result: null }), has: () => false },
     logger: { info() {}, warn() {}, error() {}, debug() {} }
   });
   const result = await request(
@@ -398,7 +398,7 @@ test('history is not fetched when the context size is zero', async () => {
     memory: app.memory,
     policy: createPolicy(app.config),
     brain: { generate: async () => 'ok', complete: async () => 'ok', buildMessages: () => [{ role: 'user', content: 'x' }], chat: async () => ({ content: 'ok', toolCalls: [] }) },
-    tools: { schemas: [], execute: async () => ({ ok: true, result: null }), has: () => false },
+    tools: { schemas: [], selectSchemas: () => [], execute: async () => ({ ok: true, result: null }), has: () => false },
     logger: { info() {}, warn() {}, error() {}, debug() {} }
   });
   await request(handler, 'POST', `/webhook/${WEBHOOK_TOKEN}`, webhookPayload('stewie hello', { id: 'ctx-2' }));
@@ -490,4 +490,28 @@ test('an ambiguous partial group name is reported, not guessed', async () => {
     { authorization: `Bearer ${ADMIN_TOKEN}`, 'content-type': 'application/json' }
   );
   assert.equal(result.status, 409);
+});
+
+test('a failed send in one chat does not silence the bot elsewhere', async () => {
+  const app = build();
+  const failed = new Set(['120363000000000000@g.us']);
+  app.evolution.sendText = async (to) => {
+    if (failed.has(to)) throw new Error('not a member');
+    app.sent.push({ to });
+  };
+  const handler = createHandler({
+    config: app.config,
+    evolution: app.evolution,
+    memory: app.memory,
+    policy: createPolicy(app.config),
+    brain: app.brain,
+    tools: app.tools,
+    logger: { info() {}, warn() {}, error() {}, debug() {} }
+  });
+  await request(handler, 'POST', `/webhook/${WEBHOOK_TOKEN}`, webhookPayload('stewie ping', { id: 'bf-1' }));
+  await settle(80);
+  assert.equal(app.sent.length, 0);
+  await request(handler, 'POST', `/webhook/${WEBHOOK_TOKEN}`, webhookPayload('stewie ping', { id: 'bf-2', jid: '260768479144@s.whatsapp.net' }));
+  await settle(80);
+  assert.equal(app.sent.length, 1);
 });

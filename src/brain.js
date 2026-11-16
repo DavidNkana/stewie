@@ -48,7 +48,8 @@ function buildSystemPrompt(input) {
   const rules = kind === 'group'
     ? `${BASE_RULES.join(' ')} If you have nothing worth adding, reply with exactly ${SILENT_TOKEN} and nothing else.`
     : `${BASE_RULES.join(' ')} You are in a private chat, so always reply. Never use ${SILENT_TOKEN}.`;
-  return [persona.text, contextLine, about, identity, cast?.rules, rules].filter(Boolean).join(' ');
+  // The persona is last so it is the freshest instruction in the prompt.
+  return [rules, cast?.rules, contextLine, about, identity, persona.text].filter(Boolean).join(' ');
 }
 
 /**

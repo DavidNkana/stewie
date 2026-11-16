@@ -58,9 +58,9 @@ function createHandler(deps) {
     }
   };
   const chains = new Map();
-  // A failing send (for example while WhatsApp is unpaired) must not stall the
-  // chat queue for every message, so sends are paused briefly after a failure.
-  let sendBlockedUntil = 0;
+  // A failing send (for example in a chat the account is not part of) must not
+  // silence the bot everywhere, so the pause is per chat.
+  const sendBlockedUntil = new Map();
   const unknownGroups = new Set();
 
   /** Serializes work per chat so replies never interleave in the same chat. */
@@ -224,6 +224,7 @@ function createHandler(deps) {
       const result = await runAgent({
         brain,
         tools,
+        toolSchemas: tools.selectSchemas(message.text),
         messages,
         context: {
           chatId,
@@ -250,13 +251,13 @@ function createHandler(deps) {
     }
 
     try {
-      if (Date.now() < sendBlockedUntil) {
+      if (Date.now() < (sendBlockedUntil.get(chatId) || 0)) {
         logger.warn('send_skipped', { chat: shortHash(chatId), reason: 'send_backoff' });
         return;
       }
       await evolution.sendText(chatId, reply);
     } catch (error) {
-      sendBlockedUntil = Date.now() + Math.max(0, config.sendBackoffMs);
+      sendBlockedUntil.set(chatId, Date.now() + Math.max(0, config.sendBackoffMs));
       logger.error('send_failed', { chat: shortHash(chatId), error: error.message, backoffMs: config.sendBackoffMs });
       return;
     }
@@ -485,6 +486,28 @@ function createHandler(deps) {
             return json(res, 200, { ok: true, chat: chatId, target: body.target, mentioned: participant?.participant ?? null, text });
           } catch (error) {
             logger.error('roast_failed', { error: error.message });
+            return json(res, 502, { error: error.message });
+          }
+        }
+        if (req.method === 'POST' && pathname.endsWith('/context-refresh') && pathname.startsWith('/admin/groups/')) {
+          const chatId = decodeURIComponent(pathname.slice('/admin/groups/'.length, -'/context-refresh'.length));
+          const records = await fetchHistory(chatId, 80);
+          const transcript = records
+            .filter(entry => entry.text)
+            .map(entry => `${entry.name || 'someone'}: ${entry.text}`)
+            .slice(-40)
+            .join('\n');
+          if (!transcript) return json(res, 404, { error: 'no recent messages to summarise' });
+          try {
+            const note = await brain.complete({
+              system: 'You write short operational notes about a chat. Plain text, two sentences maximum, no lists, no quotes, no preamble.',
+              user: `Chat: ${chatId}\n\nRecent messages:\n${transcript}\n\nWrite a note describing what this chat is currently about and what an assistant should know to be useful in it.`
+            });
+            memory.updateSettings(chatId, { context: note.trim() }, 'group');
+            logger.info('context_refreshed', { chat: shortHash(chatId) });
+            return json(res, 200, { ok: true, context: note.trim() });
+          } catch (error) {
+            logger.error('context_refresh_failed', { error: error.message });
             return json(res, 502, { error: error.message });
           }
         }

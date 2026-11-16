@@ -35,7 +35,7 @@ test('a looping model is cut off and still produces an answer', async () => {
   };
   const repeated = { content: '', toolCalls: [{ id: 'c1', function: { name: 'search_history', arguments: '{"query":"x"}' } }] };
   const result = await runAgent({
-    brain: brainWith([repeated, repeated, repeated, { content: 'here is the answer', toolCalls: [] }]),
+    brain: brainWith([repeated, repeated, { content: 'here is the answer', toolCalls: [] }]),
     tools,
     messages: [{ role: 'user', content: 'find something' }],
     logger: { info() {}, warn() {}, error() {}, debug() {} }

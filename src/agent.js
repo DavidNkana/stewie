@@ -4,7 +4,7 @@ const SILENT_TOKEN = '[SILENT]';
  * The agent loop: lets the model request tools, run them, and answer with
  * the result. Bounded so a confused model cannot loop forever.
  */
-async function runAgent({ brain, tools, messages, context = {}, maxRounds = 4, logger }) {
+async function runAgent({ brain, tools, toolSchemas, messages, context = {}, maxRounds = 3, logger }) {
   const conversation = [...messages];
   const seenCalls = new Map();
   let nudge = null;
@@ -13,7 +13,7 @@ async function runAgent({ brain, tools, messages, context = {}, maxRounds = 4, l
     const finalRound = round === maxRounds;
     // On the last round the model gets no tools, so it has to answer.
     const reply = await brain.chat(conversation, {
-      tools: finalRound ? undefined : tools.schemas,
+      tools: finalRound ? undefined : (toolSchemas ?? tools.schemas),
       maxTokens: 2000
     });
     const calls = reply.toolCalls || [];

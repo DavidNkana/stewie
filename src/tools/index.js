@@ -154,16 +154,41 @@ function createToolRegistry(deps) {
 
   const byName = new Map(definitions.map(tool => [tool.name, tool]));
 
+  const schemas = definitions.map(tool => ({
+    type: 'function',
+    function: {
+      name: tool.name,
+      description: tool.description,
+      parameters: tool.parameters
+    }
+  }));
+
+  /**
+   * Only offers the tools a message could plausibly need.
+   *
+   * Handing the model the whole toolbox makes it explore (and loop) instead of
+   * answering, and every extra round costs seconds in a chat.
+   */
+  function selectSchemas(messageText) {
+    const text = String(messageText || '').toLowerCase();
+    const wants = {
+      fetch_url: /https?:\/\/|\bwebsite\b|\bpage\b|\barticle\b|\blink\b/.test(text),
+      read_pdf: /\.pdf\b|\bpdf\b/.test(text),
+      calculate: /\b(calculate|compute|work out|how much|total|cost|price|per cent|%)\b|[0-9].*[+\-*/x]/.test(text),
+      create_reminder: /\bremind\b|\breminder\b|\bdon'?t let me forget\b/.test(text),
+      list_reminders: /\breminders?\b/.test(text),
+      search_history: /\b(earlier|before|last (week|month|time)|what did (we|i|you) (say|discuss)|history|previously)\b/.test(text),
+      list_chats: /\b(send|message|dm|email|tell|ask)\b/.test(text),
+      send_message: /\b(send|message|dm|email|tell|ask|follow up|reply to)\b/.test(text)
+    };
+    const selected = schemas.filter(schema => wants[schema.function.name]);
+    return selected.length ? selected : [];
+  }
+
   return {
     definitions,
-    schemas: definitions.map(tool => ({
-      type: 'function',
-      function: {
-        name: tool.name,
-        description: tool.description,
-        parameters: tool.parameters
-      }
-    })),
+    schemas,
+    selectSchemas,
     has(name) {
       return byName.has(name);
     },
