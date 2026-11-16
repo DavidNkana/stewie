@@ -76,8 +76,9 @@ function parseUpsert(payload) {
     // fromMe covers both the bot's own replies and the human owner typing.
     if (key.fromMe === true) continue;
 
+    const document = item.message?.documentMessage;
     const text = extractText(item.message);
-    if (!text || !text.trim()) continue;
+    if (!text && !document?.url) continue;
 
     const senderId = typeof key.participant === 'string' && key.participant ? key.participant : chatId;
     const timestamp = Number(item.messageTimestamp) || Date.now();
@@ -89,6 +90,9 @@ function parseUpsert(payload) {
       senderId,
       senderName: typeof item.pushName === 'string' ? item.pushName : '',
       text: text.trim(),
+      document: document?.url
+        ? { url: document.url, fileName: document.fileName || null, mimetype: document.mimetype || null }
+        : null,
       timestamp
     });
   }

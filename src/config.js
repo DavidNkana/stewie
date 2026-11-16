@@ -21,7 +21,7 @@ const DEFAULTS = {
   maxReplyChars: 900
 };
 
-const MODES = new Set(['never', 'mention', 'question', 'always']);
+const MODES = new Set(['never', 'mention', 'question', 'addressed', 'always']);
 
 function int(value, fallback) {
   const parsed = Number(value);
@@ -63,6 +63,7 @@ function buildConfig(env = process.env) {
     sendBackoffMs: int(env.STEWIE_SEND_BACKOFF_MS, DEFAULTS.sendBackoffMs),
     maxReplyChars: int(env.STEWIE_MAX_REPLY_CHARS, DEFAULTS.maxReplyChars),
     stateFile: env.STEWIE_STATE_FILE || 'data/state.json',
+    reminderFile: env.STEWIE_REMINDER_FILE || 'data/reminders.json',
     groupCacheFile: env.STEWIE_GROUP_CACHE_FILE || 'data/groups-cache.json',
     logLevel: env.STEWIE_LOG_LEVEL || 'info'
   };

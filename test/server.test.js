@@ -34,11 +34,17 @@ function build({ reply = 'sure thing' } = {}) {
     fetchGroups: async () => [{ id: '120363000000000000@g.us', subject: 'Existing Group' }],
     qr: async () => ({ code: 'qr-code', pairingCode: '12345678', base64: 'data:image/png;base64,AAAA' })
   };
-  const brain = { generate: async () => reply };
+  const brain = {
+    generate: async () => reply,
+    complete: async () => 'ok',
+    buildMessages: () => [{ role: 'user', content: 'test' }],
+    chat: async () => ({ content: reply, toolCalls: [] })
+  };
+  const tools = { schemas: [], execute: async () => ({ ok: true, result: null }), has: () => false };
   const policy = createPolicy(config);
   const logger = { info() {}, warn() {}, error() {}, debug() {} };
-  const handler = createHandler({ config, evolution, memory, policy, brain, logger });
-  return { handler, memory, sent, config, evolution };
+  const handler = createHandler({ config, evolution, memory, policy, brain, tools, logger });
+  return { handler, memory, sent, config, evolution, brain, tools };
 }
 
 function request(handler, method, url, body = '', headers = {}) {
@@ -201,13 +207,19 @@ test('an unresolvable group name is looked up once, not on every message', async
 test('a silent model decision sends nothing', async () => {
   const app = build();
   app.evolution.sendText = async () => { app.sent.push({ to: 'x', text: 'should not happen' }); };
-  const brain = { generate: async () => null };
+  const brain = {
+    generate: async () => null,
+    complete: async () => 'ok',
+    buildMessages: () => [{ role: 'user', content: 'x' }],
+    chat: async () => ({ content: null, toolCalls: [] })
+  };
   const handler = createHandler({
     config: app.config,
     evolution: app.evolution,
     memory: app.memory,
     policy: createPolicy(app.config),
     brain,
+    tools: app.tools,
     logger: { info() {}, warn() {}, error() {}, debug() {} }
   });
   await request(handler, 'POST', `/webhook/${WEBHOOK_TOKEN}`, webhookPayload('stewie hmm', { id: 'silent-1' }));
@@ -227,7 +239,9 @@ test('a character can be compiled into a persona through the admin api', async (
   const app = build();
   const brain = {
     generate: async () => 'ok',
-    complete: async () => 'You are a calm and deliberate character.'
+    complete: async () => 'You are a calm and deliberate character.',
+    buildMessages: () => [{ role: 'user', content: 'x' }],
+    chat: async () => ({ content: 'ok', toolCalls: [] })
   };
   const handler = createHandler({
     config: app.config,
@@ -235,6 +249,7 @@ test('a character can be compiled into a persona through the admin api', async (
     memory: app.memory,
     policy: createPolicy(app.config),
     brain,
+    tools: app.tools,
     logger: { info() {}, warn() {}, error() {}, debug() {} }
   });
   const result = await request(
@@ -269,7 +284,8 @@ test('a group can be enabled by name', async () => {
     evolution: app.evolution,
     memory: app.memory,
     policy: createPolicy(app.config),
-    brain: { generate: async () => 'ok' },
+    brain: { generate: async () => 'ok', complete: async () => 'ok', buildMessages: () => [{ role: 'user', content: 'x' }], chat: async () => ({ content: 'ok', toolCalls: [] }) },
+    tools: { schemas: [], execute: async () => ({ ok: true, result: null }), has: () => false },
     logger: { info() {}, warn() {}, error() {}, debug() {} }
   });
   const result = await request(
@@ -294,7 +310,8 @@ test('an ambiguous group name is reported instead of guessed', async () => {
     evolution: app.evolution,
     memory: app.memory,
     policy: createPolicy(app.config),
-    brain: { generate: async () => 'ok' },
+    brain: { generate: async () => 'ok', complete: async () => 'ok', buildMessages: () => [{ role: 'user', content: 'x' }], chat: async () => ({ content: 'ok', toolCalls: [] }) },
+    tools: { schemas: [], execute: async () => ({ ok: true, result: null }), has: () => false },
     logger: { info() {}, warn() {}, error() {}, debug() {} }
   });
   const result = await request(
@@ -319,7 +336,8 @@ test('all groups can be opened in one call', async () => {
     evolution: app.evolution,
     memory: app.memory,
     policy: createPolicy(app.config),
-    brain: { generate: async () => 'ok' },
+    brain: { generate: async () => 'ok', complete: async () => 'ok', buildMessages: () => [{ role: 'user', content: 'x' }], chat: async () => ({ content: 'ok', toolCalls: [] }) },
+    tools: { schemas: [], execute: async () => ({ ok: true, result: null }), has: () => false },
     logger: { info() {}, warn() {}, error() {}, debug() {} }
   });
   const result = await request(
@@ -350,8 +368,10 @@ test('history from Evolution is used as context when enabled', async () => {
     };
   };
   const brain = {
-    generate: async ({ history }) => { return 'ok'; },
-    complete: async () => 'ok'
+    generate: async () => 'ok',
+    complete: async () => 'ok',
+    buildMessages: () => [{ role: 'user', content: 'x' }],
+    chat: async () => ({ content: 'ok', toolCalls: [] })
   };
   app.memory.updateSettings('120363000000000000@g.us', { contextMessages: 20 }, 'group');
   const handler = createHandler({
@@ -360,6 +380,7 @@ test('history from Evolution is used as context when enabled', async () => {
     memory: app.memory,
     policy: createPolicy(app.config),
     brain,
+    tools: app.tools,
     logger: { info() {}, warn() {}, error() {}, debug() {} }
   });
   await request(handler, 'POST', `/webhook/${WEBHOOK_TOKEN}`, webhookPayload('stewie what broke?', { id: 'ctx-1' }));
@@ -376,7 +397,8 @@ test('history is not fetched when the context size is zero', async () => {
     evolution: app.evolution,
     memory: app.memory,
     policy: createPolicy(app.config),
-    brain: { generate: async () => 'ok', complete: async () => 'ok' },
+    brain: { generate: async () => 'ok', complete: async () => 'ok', buildMessages: () => [{ role: 'user', content: 'x' }], chat: async () => ({ content: 'ok', toolCalls: [] }) },
+    tools: { schemas: [], execute: async () => ({ ok: true, result: null }), has: () => false },
     logger: { info() {}, warn() {}, error() {}, debug() {} }
   });
   await request(handler, 'POST', `/webhook/${WEBHOOK_TOKEN}`, webhookPayload('stewie hello', { id: 'ctx-2' }));
@@ -432,7 +454,7 @@ test('an exact group name wins over a partial match', async () => {
     evolution: app.evolution,
     memory: app.memory,
     policy: createPolicy(app.config),
-    brain: { generate: async () => 'ok', complete: async () => 'Woody, eat shit.' },
+    brain: { generate: async () => 'ok', complete: async () => 'Woody, eat shit.', buildMessages: () => [{ role: 'user', content: 'x' }], chat: async () => ({ content: 'Woody, eat shit.', toolCalls: [] }) },
     logger: { info() {}, warn() {}, error() {}, debug() {} }
   });
   const result = await request(

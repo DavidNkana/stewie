@@ -90,3 +90,18 @@ test('group chat questions are detected without a question mark', () => {
   }
   assert.equal(policy.decide({ message: { isGroup: true, text: 'ok thanks' }, settings }).reason, 'not_a_question');
 });
+
+test('addressed mode replies when someone talks to the bot without naming it', () => {
+  const policy = createPolicy(config, { now: () => 1000, random: () => 0 });
+  const settings = { enabled: true, mode: 'addressed' };
+  for (const text of ['can you look at this quote', 'what do you think?', 'remind me to chase the invoice', 'please check the numbers']) {
+    assert.equal(policy.decide({ message: { isGroup: true, text }, settings }).reply, true, text);
+  }
+});
+
+test('addressed mode stays quiet for ordinary chatter', () => {
+  const policy = createPolicy(config, { now: () => 1000, random: () => 0 });
+  const settings = { enabled: true, mode: 'addressed' };
+  assert.equal(policy.decide({ message: { isGroup: true, text: 'ok thanks' }, settings }).reason, 'not_addressed');
+  assert.equal(policy.decide({ message: { isGroup: true, text: 'see you at 5' }, settings }).reason, 'not_addressed');
+});

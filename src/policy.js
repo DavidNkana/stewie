@@ -1,4 +1,20 @@
 const QUESTION_WORDS = ['what', 'who', 'where', 'when', 'why', 'how', 'which', 'can you', 'could you', 'do you', 'did you', 'is there', 'anyone', 'anybody'];
+// Phrases that show a message is aimed at the assistant, even without its name.
+const ADDRESSED_PATTERNS = [
+  /^(hey |ok |yo |hmm |right )?(hitch|stewie|alex)\b/i,
+  /^(can|could|would|will|you)\b/i,
+  /^please\b/i,
+  /^help me\b/i,
+  /^what do you (think|reckon|suggest)\b/i,
+  /^any (idea|thoughts|suggestions)\b/i,
+  /^(thoughts|ideas|suggestions|advice)\b/i,
+  /^(check|look at|read|open|view|download|remind|calculate|work out|figure out)\b/i,
+  /^(give|send|post|reply|follow up|draft|set up|arrange)\b/i,
+  /^what('s| is) the\b/i,
+  /^how (do|should|much|many)\b/i,
+  /^(do|can you) (you|we)\b/i
+];
+
 // Group chat rarely uses question marks, so these markers count anywhere.
 const QUESTION_MARKERS = /\b(anyone|anybody|anyone\s+else|can someone|could someone|can somebody|help|quick one|any idea|thoughts|opinions|what do you think|anyone know)\b/i;
 
@@ -18,6 +34,12 @@ function createPolicy(config, options = {}) {
       const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       return new RegExp(`(^|[^a-z0-9])${escaped}([^a-z0-9]|$)`, 'i').test(haystack);
     });
+  }
+
+  function isAddressed(text) {
+    const value = String(text || '').trim();
+    if (!value) return false;
+    return ADDRESSED_PATTERNS.some(pattern => pattern.test(value));
   }
 
   function isQuestion(text) {
@@ -41,6 +63,9 @@ function createPolicy(config, options = {}) {
 
     if (mode === 'mention' && !mentioned) return { reply: false, reason: 'not_mentioned' };
     if (mode === 'question' && !mentioned && !question) return { reply: false, reason: 'not_a_question' };
+    if (mode === 'addressed' && !mentioned && !question && !isAddressed(message.text)) {
+      return { reply: false, reason: 'not_addressed' };
+    }
 
     const cooldownMs = Math.max(0, config.cooldownSeconds) * 1000;
     if (cooldownMs && lastReplyAt && now() - lastReplyAt < cooldownMs) {
@@ -62,7 +87,7 @@ function createPolicy(config, options = {}) {
     return { reply: true, reason: mentioned ? 'mentioned' : question ? 'question' : 'mode_always' };
   }
 
-  return { decide, mentionsBot, isQuestion };
+  return { decide, mentionsBot, isQuestion, isAddressed };
 }
 
 module.exports = { createPolicy, QUESTION_WORDS };

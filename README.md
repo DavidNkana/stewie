@@ -112,6 +112,60 @@ The fetch is a local read from Evolution's database and takes milliseconds.
 **Those older messages are sent to the configured model provider**, so raise the
 number only as far as you need.
 
+## What it can do
+
+Hitch is a chat brain with hands. Beyond conversation it can:
+
+| Capability | How |
+| --- | --- |
+| **Read links** | URLs in a message are fetched and their text handed to the model before it answers |
+| **Read PDFs** | PDF links and PDF attachments are downloaded and text-extracted with `pdftotext` |
+| **Calculate** | Arithmetic is evaluated by a purpose-built parser, not guessed by the model |
+| **Remind** | "Remind me to chase the invoice Thursday 10am" creates a reminder that the service delivers |
+| **Look back** | Search earlier messages in the chats |
+| **Orchestrate** | Draft and send messages to other chats and groups on request |
+| **Know the room** | Each chat carries a context note ("what this chat is about"), set through the admin API |
+
+The model drives the tools through native function calling, but links, PDFs and
+arithmetic are resolved **before** it is asked anything. The model is
+unreliable about choosing to call tools, and when it skips them it invents the
+contents.
+
+### Tools
+
+| Tool | Purpose |
+| --- | --- |
+| `fetch_url` | Open a web page and read it |
+| `read_pdf` | Download a PDF and extract its text |
+| `calculate` | Evaluate an expression exactly |
+| `create_reminder` / `list_reminders` | Set and list reminders |
+| `search_history` | Find what was said earlier |
+| `list_chats` / `send_message` | Work with other chats |
+
+Fetches refuse private, loopback and link-local addresses, so a link in a
+message can never reach this host's network or its cloud metadata.
+
+### Trigger modes
+
+| Mode | Replies when |
+| --- | --- |
+| `addressed` | the bot is named, the message is a question, or it is clearly talking to the bot |
+| `mention` | only when named |
+| `question` | on questions |
+| `always` | on everything |
+| `never` | never |
+
+`addressed` is the default for groups.
+
+### Group context
+
+```sh
+curl -s -X POST -H "Authorization: Bearer $STEWIE_ADMIN_TOKEN" \
+  -H 'content-type: application/json' \
+  -d '{"context":"Finance for SafAi: tax notices, quotes, invoices and cash flow."}' \
+  http://127.0.0.1:8099/admin/groups/<group-id>
+```
+
 ## Personas
 
 A persona is the voice Stewie speaks with. It is just a prompt, so anything

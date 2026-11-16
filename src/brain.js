@@ -33,8 +33,8 @@ function timeOfDay(timezone) {
 }
 
 function buildSystemPrompt(input) {
-  const { persona, chatName, kind, botName, timezone, speakers, cast } = input;
-  const context = kind === 'group'
+  const { persona, chatName, kind, botName, timezone, speakers, cast, context } = input;
+  const contextLine = kind === 'group'
     ? [
       `You are in the WhatsApp group${chatName ? ` "${chatName}"` : ''}.`,
       'Other people are talking; you are one of them, not a moderator, not a helper.',
@@ -43,7 +43,8 @@ function buildSystemPrompt(input) {
     ].filter(Boolean).join(' ')
     : `You are in a private WhatsApp chat. It is ${timeOfDay(timezone)}.`;
   const identity = botName ? `People sometimes call you "${botName}".` : '';
-  return [persona.text, context, identity, cast?.rules, RULES].filter(Boolean).join(' ');
+  const about = context ? `What this chat is about: ${context}` : '';
+  return [persona.text, contextLine, about, identity, cast?.rules, RULES].filter(Boolean).join(' ');
 }
 
 /**
@@ -54,12 +55,12 @@ function buildSystemPrompt(input) {
  */
 function createBrain(config, fetchImpl = fetch) {
   /** Raw OpenAI-compatible chat completion. Returns text or null. */
-  async function chatCompletion(messages, { maxTokens = 500 } = {}) {
+  async function chatCompletion(messages, { maxTokens = 500, tools } = {}) {
     // One retry: a provider hiccup must not silently drop a reply.
     let lastError = null;
     for (let attempt = 1; attempt <= 2; attempt++) {
       try {
-        return await chatCompletionOnce(messages, maxTokens);
+        return await chatCompletionOnce(messages, maxTokens, tools);
       } catch (error) {
         lastError = error;
         if (attempt === 2) break;
@@ -68,8 +69,9 @@ function createBrain(config, fetchImpl = fetch) {
     throw lastError;
   }
 
-  async function chatCompletionOnce(messages, maxTokens) {
+  async function chatCompletionOnce(messages, maxTokens, tools) {
     const body = { model: config.model, messages };
+    if (tools && tools.length) body.tools = tools;
     if (REASONING_MODEL.test(config.model)) {
       body.max_completion_tokens = maxTokens;
     } else {
@@ -97,47 +99,68 @@ function createBrain(config, fetchImpl = fetch) {
     }
 
     const data = await response.json();
-    const content = data?.choices?.[0]?.message?.content;
-    const answer = stripThinking(typeof content === 'string' ? content : '');
-    if (!answer) throw new Error('model api returned no text');
-    return answer;
+    const message = data?.choices?.[0]?.message || {};
+    const content = stripThinking(typeof message.content === 'string' ? message.content : '');
+    const toolCalls = Array.isArray(message.tool_calls) ? message.tool_calls : [];
+    if (!content && !toolCalls.length) throw new Error('model api returned no text');
+    return { content, toolCalls };
   }
 
   /** One-off completion used for tooling (for example the character compiler). */
   async function complete({ system, user }) {
-    const answer = await chatCompletion([
+    const reply = await chatCompletion([
       { role: 'system', content: system },
       { role: 'user', content: user }
     ], { maxTokens: 1500 });
-    return answer.slice(0, 2000);
+    return String(reply.content || '').slice(0, 2000);
   }
 
-  async function generate(input) {
+  /** Builds the message list for one turn, including the group context. */
+  function buildMessages(input) {
     const { history = [], message, settings = {}, chatName = '', kind = 'dm' } = input;
     const cast = resolveCast({
       speakerName: message.senderName,
       speakerId: message.senderId,
       text: message.text
     });
-    const model = config.model;
     const persona = resolvePersona(settings.persona || config.persona || config.personaId);
     const speakers = new Set(history.filter(entry => entry.name).map(entry => entry.name)).size;
 
-    const messages = [
-      { role: 'system', content: buildSystemPrompt({ persona, chatName, kind, botName: config.botName, timezone: config.timezone, speakers, cast }) },
+    return [
+      { role: 'system', content: buildSystemPrompt({
+        persona,
+        chatName,
+        kind,
+        botName: config.botName,
+        timezone: config.timezone,
+        speakers,
+        cast,
+        context: settings.context
+      }) },
       ...history.map(entry => ({
         role: entry.role === 'assistant' ? 'assistant' : 'user',
         content: entry.name && entry.role !== 'assistant' ? `${entry.name}: ${entry.text}` : entry.text
       })),
       { role: 'user', content: message.text }
     ];
+  }
 
-    const answer = await chatCompletion(messages);
+  async function generate(input) {
+    const model = config.model;
+    const messages = buildMessages(input);
+    const reply = await chatCompletion(messages);
+    const answer = reply.content;
+    if (!answer) return null;
     if (answer === SILENT_TOKEN || answer === SILENT_TOKEN.toLowerCase()) return null;
     return answer.slice(0, config.maxReplyChars);
   }
 
-  return { generate, complete, buildSystemPrompt, resolvePersona };
+  /** Raw chat call used by the agent loop (returns content and tool calls). */
+  async function chat(messages, options = {}) {
+    return chatCompletion(messages, options);
+  }
+
+  return { generate, complete, chat, buildMessages, buildSystemPrompt, resolvePersona };
 }
 
 module.exports = { createBrain, buildSystemPrompt, stripThinking, resolvePersona, REASONING_MODEL, SILENT_TOKEN };

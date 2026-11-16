@@ -8,6 +8,8 @@ const { createBrain } = require('./brain');
 const { createEvolution } = require('./evolution');
 const { createHandler } = require('./server');
 const { createGroupDirectory } = require('./groups');
+const { createToolRegistry } = require('./tools');
+const { createReminderStore } = require('./tools/reminders');
 
 async function main() {
   loadEnv();
@@ -20,7 +22,9 @@ async function main() {
   const evolution = createEvolution(config);
 
   const directory = createGroupDirectory({ evolution, logger, cacheFile: config.groupCacheFile });
-  const handler = createHandler({ config, evolution, memory, policy, brain, logger, directory });
+  const reminders = createReminderStore({ file: config.reminderFile });
+  const tools = createToolRegistry({ config, evolution, reminders, logger, directory, memory });
+  const handler = createHandler({ config, evolution, memory, policy, brain, logger, directory, tools, reminders });
   const server = http.createServer((req, res) => {
     handler(req, res).catch(error => {
       logger.error('handler_crashed', { error: error.message });
@@ -87,9 +91,26 @@ async function main() {
     logger.warn('evolution_state_unavailable', { error: error.message });
   }
 
+  // Reminders: deliver anything that has come due.
+  async function deliverReminders() {
+    const due = reminders.due();
+    for (const reminder of due) {
+      try {
+        await evolution.sendText(reminder.chatId, `Reminder: ${reminder.text}`);
+        reminders.complete(reminder.id);
+        logger.info('reminder_delivered', { id: reminder.id, chat: reminder.chatId });
+      } catch (error) {
+        logger.warn('reminder_delivery_failed', { id: reminder.id, error: error.message });
+      }
+    }
+  }
+  const reminderTimer = setInterval(() => deliverReminders(), 30000);
+  reminderTimer.unref();
+
   const shutdown = signal => {
     logger.info('shutting_down', { signal });
     clearInterval(webhookTimer);
+    clearInterval(reminderTimer);
     server.close(() => process.exit(0));
     setTimeout(() => process.exit(0), 8000).unref();
   };

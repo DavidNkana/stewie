@@ -1,5 +1,7 @@
 const crypto = require('node:crypto');
 const { parseUpsert, extractText } = require('./parse');
+const { runAgent } = require('./agent');
+const { prefetch } = require('./tools/prefetch');
 const { shortHash } = require('./logger');
 const { listPersonas, compilePersona, resolvePersona } = require('../personality');
 const { saveCustom, deleteCustom } = require('../personality/store');
@@ -39,7 +41,7 @@ function readBody(req, limitBytes = 1024 * 1024) {
  * Admin routes require `Authorization: Bearer <STEWIE_ADMIN_TOKEN>`.
  */
 function createHandler(deps) {
-  const { config, evolution, memory, policy, brain, logger, directory } = deps;
+  const { config, evolution, memory, policy, brain, logger, directory, tools, reminders } = deps;
   // Fallback for callers that do not provide a cached directory.
   const groupDirectory = directory || {
     list: async () => {
@@ -209,7 +211,27 @@ function createHandler(deps) {
 
     let reply;
     try {
-      reply = await brain.generate({ history, message, settings, chatName, kind });
+      // Read links, PDFs and arithmetic deterministically before the model answers.
+      const fetched = await prefetch({ message, config, logger });
+      const turnSettings = fetched ? { ...settings, context: [settings.context, fetched].filter(Boolean).join('\n\n') } : settings;
+      const messages = brain.buildMessages({ history, message, settings: turnSettings, chatName, kind });
+      const result = await runAgent({
+        brain,
+        tools,
+        messages,
+        context: {
+          chatId,
+          kind,
+          chatName,
+          speakerName: message.senderName,
+          speakerId: message.senderId
+        },
+        logger
+      });
+      reply = result.content;
+      if (result.toolsUsed?.length) {
+        logger.info('tools_used', { chat: shortHash(chatId), tools: result.toolsUsed.map(entry => entry.name).join(',') });
+      }
     } catch (error) {
       logger.error('brain_failed', { chat: shortHash(chatId), error: error.message });
       return;
@@ -313,6 +335,7 @@ function createHandler(deps) {
         mode: chat.mode || null,
         persona: chat.persona || null,
         probability: chat.probability ?? null,
+        context: chat.context || null,
         messages: (chat.messages || []).length,
         replies: (chat.replies || []).length,
         lastReplyAt: chat.lastReplyAt || null
@@ -361,12 +384,12 @@ function createHandler(deps) {
     } catch (error) {
       return json(res, 400, { error: error.message });
     }
-    const allowed = ['enabled', 'mode', 'persona', 'probability', 'name', 'contextMessages'];
+    const allowed = ['enabled', 'mode', 'persona', 'probability', 'name', 'contextMessages', 'context'];
     const clean = {};
     for (const key of allowed) {
       if (patch[key] !== undefined) clean[key] = patch[key];
     }
-    if (clean.mode && !['never', 'mention', 'question', 'always'].includes(clean.mode)) {
+    if (clean.mode && !['never', 'mention', 'question', 'addressed', 'always'].includes(clean.mode)) {
       return json(res, 400, { error: 'invalid mode' });
     }
     if (clean.probability !== undefined && (clean.probability < 0 || clean.probability > 1)) {
@@ -460,7 +483,7 @@ function createHandler(deps) {
           if (body.mode !== undefined) patch.mode = body.mode;
           if (body.persona !== undefined) patch.persona = body.persona;
           if (body.probability !== undefined) patch.probability = body.probability;
-          if (body.mode && !['never', 'mention', 'question', 'always'].includes(body.mode)) {
+          if (body.mode && !['never', 'mention', 'question', 'addressed', 'always'].includes(body.mode)) {
             return json(res, 400, { error: 'invalid mode' });
           }
           if (!Object.keys(patch).length) return json(res, 400, { error: 'nothing to change' });
