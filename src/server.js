@@ -409,7 +409,19 @@ function createHandler(deps) {
 
     try {
       if (req.method === 'GET' && pathname === '/health') {
-        return json(res, 200, { ok: true, instance: config.evolutionInstance, model: config.model });
+        let whatsapp = 'unknown';
+        try {
+          const state = await evolution.connectionState();
+          whatsapp = state?.instance?.state ?? 'unknown';
+        } catch {
+          whatsapp = 'unreachable';
+        }
+        return json(res, 200, {
+          ok: true,
+          instance: config.evolutionInstance,
+          model: config.model,
+          whatsapp
+        });
       }
 
       if (req.method === 'POST' && pathname.startsWith('/webhook/')) {
