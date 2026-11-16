@@ -5,6 +5,7 @@ const DEFAULT_SETTINGS = {
   enabled: true,
   contextMessages: null,
   context: null,
+  personaUsed: null,
   mode: null,
   persona: null,
   probability: null,
@@ -46,7 +47,7 @@ function createMemory(options = {}) {
       chat.messages = (chat.messages || []).filter(entry => Number(entry.ts) >= limit);
       chat.replies = (chat.replies || []).filter(ts => Number(ts) >= limit);
       // Never drop a chat the operator configured explicitly, even if it has no traffic.
-      if (!chat.messages.length && !(chat.replies || []).length && !chat.configured) delete state.chats[id];
+      if (!chat.messages.length && !(chat.replies || []).length && !chat.configured && !chat.personaUsed) delete state.chats[id];
     }
     for (const [id, ts] of Object.entries(state.processed)) {
       if (Number(ts) < limit) delete state.processed[id];
@@ -100,6 +101,19 @@ function createMemory(options = {}) {
       record.configured = true;
       save();
       return this.settings(id, kind);
+    },
+    /**
+     * Keeps the stored replies in step with the persona that produced them.
+     * When the voice changes, our own old replies are dropped so the new
+     * persona is not anchored by the previous one.
+     */
+    applyPersona(id, personaKey, kind) {
+      const record = chat(id, kind);
+      if (record.personaUsed === personaKey) return false;
+      record.personaUsed = personaKey;
+      record.messages = (record.messages || []).filter(entry => entry.role !== 'assistant');
+      save();
+      return true;
     },
     record(id, entry, kind) {
       const record = chat(id, kind);

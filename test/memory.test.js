@@ -87,3 +87,22 @@ test('changing the persona clears our own prior replies but keeps the chat conte
   assert.equal(history.length, 2);
   assert.ok(history.every(entry => entry.role === 'user'));
 });
+
+test('a persona change clears the old voice from the stored replies', () => {
+  const memory = createMemory({ file: tempFile() });
+  memory.record('chat', { role: 'user', text: 'hi', ts: Date.now() });
+  memory.record('chat', { role: 'assistant', text: 'old voice', ts: Date.now() });
+  assert.equal(memory.applyPersona('chat', 'hitch'), true);
+  const history = memory.history('chat');
+  assert.equal(history.length, 1);
+  assert.equal(history[0].role, 'user');
+  assert.equal(memory.applyPersona('chat', 'hitch'), false);
+});
+
+test('the persona marker survives a reload', () => {
+  const file = tempFile();
+  const memory = createMemory({ file });
+  memory.applyPersona('chat', 'hitch');
+  const reloaded = createMemory({ file });
+  assert.equal(reloaded.applyPersona('chat', 'hitch'), false);
+});

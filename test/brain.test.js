@@ -154,3 +154,27 @@ test('the prompt carries the persona, group name and speaker count', async () =>
   assert.match(system, /about 2 people active/);
   assert.match(system, /\[SILENT\]/);
 });
+
+test('a truncated reasoning answer is retried with a larger budget', async () => {
+  const budgets = [];
+  const brain = createBrain({
+    model: 'MiniMax-M3',
+    modelBaseUrl: 'https://api.test/v1',
+    modelApiKey: 'k',
+    requestTimeoutMs: 5000,
+    maxReplyChars: 900,
+    botName: 'hitch',
+    personaId: 'hitch',
+    timezone: 'Africa/Lusaka'
+  }, async (url, options) => {
+    const body = JSON.parse(options.body);
+    budgets.push(body.max_tokens);
+    if (body.max_tokens < 4000) {
+      return { ok: true, status: 200, json: async () => ({ choices: [{ finish_reason: 'length', message: { content: '<think>reasoning swallowed the budget</think>' } }] }), text: async () => '' };
+    }
+    return response('the actual answer');
+  });
+  const answer = await brain.generate({ message: { text: 'hi' }, history: [], settings: {}, kind: 'dm' });
+  assert.equal(answer, 'the actual answer');
+  assert.deepEqual(budgets, [500, 4000]);
+});

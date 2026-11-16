@@ -202,6 +202,12 @@ function createHandler(deps) {
     }
 
     const chatName = message.isGroup ? await resolveGroupName(chatId) : settings.name;
+    // If the voice changed since our last reply here, drop our old replies so
+    // the new persona is not anchored by the previous one.
+    const personaKey = settings.persona || config.persona || config.personaId || 'stewie';
+    if (memory.applyPersona(chatId, personaKey, kind)) {
+      logger.info('persona_history_reset', { chat: shortHash(chatId), persona: personaKey });
+    }
     const contextLimit = settings.contextMessages ?? config.contextMessages;
     const storedHistory = memory.history(chatId, 12, kind);
     const history = contextLimit
