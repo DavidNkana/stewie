@@ -119,12 +119,14 @@ works. Personas live in `personality/`:
 
 | Id | Voice |
 | --- | --- |
-| `stewie` | default: laid-back, sharp, reads the room, sometimes stays quiet |
+| `stewie` | laid-back, sharp, reads the room, sometimes stays quiet |
 | `hector` | the established "laid-back but sharp guy" voice |
 | `jack-sparrow` | theatrical, scheming, Caribbean flavour |
 | `stewie-griffin` | hyper-intelligent, foul-mouthed, sarcastic; swears in every reply |
+| `hitch` | **default**: charismatic sales brain — makes people feel good and closes the deal |
 
-Assign one per chat (it overrides the global default):
+The global default is `STEWIE_PERSONA_ID` in `.env` (currently `hitch`).
+Assign one per chat to override it:
 
 ```sh
 curl -s -X POST -H "Authorization: Bearer $STEWIE_ADMIN_TOKEN" \

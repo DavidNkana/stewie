@@ -31,3 +31,11 @@ test('the registry exposes the built in personas', () => {
     assert.ok(ids.includes(builtin), `missing builtin persona ${builtin}`);
   }
 });
+
+test('hitch is a sales persona, not a romance persona', () => {
+  const persona = resolvePersona('hitch');
+  assert.equal(persona.id, 'hitch');
+  assert.match(persona.text, /sell sand/);
+  assert.match(persona.text, /No flirting, no romance/);
+  assert.match(persona.text, /never invent facts/);
+});
