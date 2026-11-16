@@ -1,4 +1,8 @@
 const QUESTION_WORDS = ['what', 'who', 'where', 'when', 'why', 'how', 'which', 'can you', 'could you', 'do you', 'did you', 'is there', 'anyone', 'anybody'];
+// Signals that a group message is open to input, so the assistant can add
+// value instead of waiting to be called by name.
+const INPUT_MARKERS = /\b(thoughts|any idea|any ideas|anyone know|does anyone|who has|who knows|can we|should we|how do we|what do you think|what's the plan|whats the plan|need(s)? (help|a hand|someone)|help me|remind me|deadline|invoice|quote|proposal|budget|price|pricing|client|customer|project|deploy|deployment|website|domain|task|meeting|launch|bug|fix|support|payment|contract|app (build|idea|development))\b/i;
+
 // Phrases that show a message is aimed at the assistant, even without its name.
 const ADDRESSED_PATTERNS = [
   /^(hey |ok |yo |hmm |right )?(hitch|stewie|alex)\b/i,
@@ -66,6 +70,9 @@ function createPolicy(config, options = {}) {
     if (mode === 'addressed' && !mentioned && !question && !isAddressed(message.text)) {
       return { reply: false, reason: 'not_addressed' };
     }
+    if (mode === 'active' && !mentioned && !question && !isAddressed(message.text) && !INPUT_MARKERS.test(message.text)) {
+      return { reply: false, reason: 'not_addressed' };
+    }
 
     const cooldownMs = Math.max(0, config.cooldownSeconds) * 1000;
     if (cooldownMs && lastReplyAt && now() - lastReplyAt < cooldownMs) {
@@ -87,7 +94,7 @@ function createPolicy(config, options = {}) {
     return { reply: true, reason: mentioned ? 'mentioned' : question ? 'question' : 'mode_always' };
   }
 
-  return { decide, mentionsBot, isQuestion, isAddressed };
+  return { decide, mentionsBot, isQuestion, isAddressed, INPUT_MARKERS };
 }
 
 module.exports = { createPolicy, QUESTION_WORDS };

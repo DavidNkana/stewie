@@ -105,3 +105,18 @@ test('addressed mode stays quiet for ordinary chatter', () => {
   assert.equal(policy.decide({ message: { isGroup: true, text: 'ok thanks' }, settings }).reason, 'not_addressed');
   assert.equal(policy.decide({ message: { isGroup: true, text: 'see you at 5' }, settings }).reason, 'not_addressed');
 });
+
+test('active mode joins in on work messages without being named', () => {
+  const policy = createPolicy(config, { now: () => 1000, random: () => 0 });
+  const settings = { enabled: true, mode: 'active' };
+  for (const text of ['the client wants 30 day terms', 'any thoughts on the launch date?', 'who has the domain login', 'we need the invoice chased']) {
+    assert.equal(policy.decide({ message: { isGroup: true, text }, settings }).reply, true, text);
+  }
+});
+
+test('active mode still ignores pure chatter', () => {
+  const policy = createPolicy(config, { now: () => 1000, random: () => 0 });
+  const settings = { enabled: true, mode: 'active' };
+  assert.equal(policy.decide({ message: { isGroup: true, text: 'ok thanks' }, settings }).reason, 'not_addressed');
+  assert.equal(policy.decide({ message: { isGroup: true, text: 'morning all' }, settings }).reason, 'not_addressed');
+});

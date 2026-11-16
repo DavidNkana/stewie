@@ -446,7 +446,7 @@ function createHandler(deps) {
     for (const key of allowed) {
       if (patch[key] !== undefined) clean[key] = patch[key];
     }
-    if (clean.mode && !['never', 'mention', 'question', 'addressed', 'always'].includes(clean.mode)) {
+    if (clean.mode && !['never', 'mention', 'question', 'addressed', 'active', 'always'].includes(clean.mode)) {
       return json(res, 400, { error: 'invalid mode' });
     }
     if (clean.probability !== undefined && (clean.probability < 0 || clean.probability > 1)) {
@@ -574,7 +574,7 @@ function createHandler(deps) {
           if (body.mode !== undefined) patch.mode = body.mode;
           if (body.persona !== undefined) patch.persona = body.persona;
           if (body.probability !== undefined) patch.probability = body.probability;
-          if (body.mode && !['never', 'mention', 'question', 'addressed', 'always'].includes(body.mode)) {
+          if (body.mode && !['never', 'mention', 'question', 'addressed', 'active', 'always'].includes(body.mode)) {
             return json(res, 400, { error: 'invalid mode' });
           }
           if (!Object.keys(patch).length) return json(res, 400, { error: 'nothing to change' });

@@ -21,7 +21,7 @@ const DEFAULTS = {
   maxReplyChars: 900
 };
 
-const MODES = new Set(['never', 'mention', 'question', 'addressed', 'always']);
+const MODES = new Set(['never', 'mention', 'question', 'addressed', 'active', 'always']);
 
 function int(value, fallback) {
   const parsed = Number(value);

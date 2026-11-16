@@ -152,6 +152,7 @@ message can never reach this host's network or its cloud metadata.
 | `addressed` | the bot is named, the message is a question, or it is clearly talking to the bot |
 | `mention` | only when named |
 | `question` | on questions |
+| `active` | when addressed, on questions, or when the message invites input (mentions a client, invoice, task, deadline and so on) |
 | `always` | on everything |
 | `never` | never |
 

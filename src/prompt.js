@@ -60,6 +60,13 @@ const TEAM_BEHAVIOUR = [
   'Never ask a teammate to pretend to be a customer to get a useful answer. If someone asks "what should we tell this client?", draft the answer from approved facts and relevant authorised context.'
 ].join(' ');
 
+const FORMAT_RULES = [
+  'Keep it short: one or two paragraphs, usually 1-4 sentences, unless the person asks for detail or you are drafting something for them to send.',
+  'Never use markdown. No asterisks, no hash headings, no underscores, no numbered lists, no bullet characters and no blockquotes. Plain sentences in a chat message.',
+  'Give the answer first, then the minimum detail that helps. Do not repeat yourself and do not add a summary of what you just said.',
+  'When you draft a message for someone else to send, give it as plain text they can copy, and only when the person explicitly asks for something to send. Otherwise advise, do not supply a template.'
+].join(' ');
+
 const NO_HITL_INTEGRATION = [
   'There is no booking, CRM or handoff integration connected. Never say a meeting is booked, a lead is saved, an invoice is sent or the team has been notified.',
   'If someone wants a meeting, collect a preferred time and say availability needs confirmation. Do not manufacture a booking link.',
@@ -83,6 +90,7 @@ function buildPrompt({ mode, knowledgeBlock, contextBlock, castRules, teamGroupI
     layers.push(IDENTITY_PERSONA);
   }
 
+  layers.push(FORMAT_RULES);
   if (mode === TEAM) {
     layers.push(TEAM_BEHAVIOUR);
     if (castRules) layers.push(`How you know the people in this group: ${castRules}`);
@@ -107,6 +115,7 @@ function buildPrompt({ mode, knowledgeBlock, contextBlock, castRules, teamGroupI
 
 module.exports = {
   buildPrompt,
+  FORMAT_RULES,
   IDENTITY: IDENTITY_PERSONA,
   IDENTITY_TRANSPARENT,
   IDENTITY_PERSONA,
