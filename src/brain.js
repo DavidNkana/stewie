@@ -138,6 +138,17 @@ function createBrain(config, fetchImpl = fetch) {
     const persona = resolvePersona(settings.persona || config.persona || config.personaId);
     const speakers = new Set(history.filter(entry => entry.name).map(entry => entry.name)).size;
 
+    if (input.systemPrompt) {
+      return [
+        { role: 'system', content: input.systemPrompt },
+        ...history.map(entry => ({
+          role: entry.role === 'assistant' ? 'assistant' : 'user',
+          content: entry.name && entry.role !== 'assistant' ? `${entry.name}: ${entry.text}` : entry.text
+        })),
+        { role: 'user', content: message.text }
+      ];
+    }
+
     return [
       { role: 'system', content: buildSystemPrompt({
         persona,

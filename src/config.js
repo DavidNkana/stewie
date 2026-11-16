@@ -63,6 +63,11 @@ function buildConfig(env = process.env) {
     sendBackoffMs: int(env.STEWIE_SEND_BACKOFF_MS, DEFAULTS.sendBackoffMs),
     maxReplyChars: int(env.STEWIE_MAX_REPLY_CHARS, DEFAULTS.maxReplyChars),
     stateFile: env.STEWIE_STATE_FILE || 'data/state.json',
+    internalGroupIds: env.STEWIE_INTERNAL_GROUP_IDS || '',
+    identityMode: env.STEWIE_IDENTITY_MODE || 'persona',
+    knowledgeFile: env.STEWIE_KNOWLEDGE_FILE || 'knowledge/safai.json',
+    leadFile: env.STEWIE_LEAD_FILE || 'data/leads.json',
+    leadRetentionDays: int(env.STEWIE_LEAD_RETENTION_DAYS, 90),
     reminderFile: env.STEWIE_REMINDER_FILE || 'data/reminders.json',
     groupCacheFile: env.STEWIE_GROUP_CACHE_FILE || 'data/groups-cache.json',
     logLevel: env.STEWIE_LOG_LEVEL || 'info'

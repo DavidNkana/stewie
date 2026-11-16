@@ -10,6 +10,8 @@ const { createHandler } = require('./server');
 const { createGroupDirectory } = require('./groups');
 const { createToolRegistry } = require('./tools');
 const { createReminderStore } = require('./tools/reminders');
+const { loadKnowledge, renderKnowledge } = require('./knowledge');
+const { createLeadStore } = require('./leads');
 
 async function main() {
   loadEnv();
@@ -23,8 +25,10 @@ async function main() {
 
   const directory = createGroupDirectory({ evolution, logger, cacheFile: config.groupCacheFile });
   const reminders = createReminderStore({ file: config.reminderFile });
-  const tools = createToolRegistry({ config, evolution, reminders, logger, directory, memory });
-  const handler = createHandler({ config, evolution, memory, policy, brain, logger, directory, tools, reminders });
+  const leads = createLeadStore({ file: config.leadFile, retentionDays: config.leadRetentionDays });
+  const knowledge = { block: renderKnowledge(loadKnowledge(config.knowledgeFile)) };
+  const tools = createToolRegistry({ config, evolution, reminders, logger, directory, memory, leads });
+  const handler = createHandler({ config, evolution, memory, policy, brain, logger, directory, tools, reminders, knowledge, leads });
   const server = http.createServer((req, res) => {
     handler(req, res).catch(error => {
       logger.error('handler_crashed', { error: error.message });

@@ -1,6 +1,9 @@
 const crypto = require('node:crypto');
 const { parseUpsert, extractText } = require('./parse');
 const { runAgent } = require('./agent');
+const { resolveMode, TEAM, CLIENT } = require('./modes');
+const { buildPrompt } = require('./prompt');
+const { resolveCast } = require('../personality/cast');
 const { prefetch } = require('./tools/prefetch');
 const { shortHash } = require('./logger');
 const { listPersonas, compilePersona, resolvePersona } = require('../personality');
@@ -41,7 +44,7 @@ function readBody(req, limitBytes = 1024 * 1024) {
  * Admin routes require `Authorization: Bearer <STEWIE_ADMIN_TOKEN>`.
  */
 function createHandler(deps) {
-  const { config, evolution, memory, policy, brain, logger, directory, tools, reminders } = deps;
+  const { config, evolution, memory, policy, brain, logger, directory, tools, reminders, knowledge, leads } = deps;
   // Fallback for callers that do not provide a cached directory.
   const groupDirectory = directory || {
     list: async () => {
@@ -184,7 +187,23 @@ function createHandler(deps) {
   async function handleMessage(message) {
     const kind = message.isGroup ? 'group' : 'dm';
     const chatId = message.chatId;
-    memory.record(chatId, { role: 'user', text: message.text, name: message.senderName, ts: message.timestamp }, kind);
+
+    // Mode comes from verified provider metadata only: the group flag and the
+    // exact configured internal group id. Nothing in the message can change it.
+    const routing = resolveMode({
+      isGroup: message.isGroup,
+      chatId,
+      internalGroupIds: config.internalGroupIds
+    });
+    if (routing.warning) logger.warn('routing_warning', { warning: routing.warning });
+
+    memory.record(chatId, {
+      role: 'user',
+      text: message.text,
+      name: message.senderName,
+      speakerId: message.senderId,
+      ts: message.timestamp
+    }, kind);
 
     const settings = memory.settings(chatId, kind);
     const hourAgo = Date.now() - 60 * 60 * 1000;
@@ -219,12 +238,42 @@ function createHandler(deps) {
     try {
       // Read links, PDFs and arithmetic deterministically before the model answers.
       const fetched = await prefetch({ message, config, logger });
-      const turnSettings = fetched ? { ...settings, context: [settings.context, fetched].filter(Boolean).join('\n\n') } : settings;
-      const messages = brain.buildMessages({ history, message, settings: turnSettings, chatName, kind });
+
+      // Only the context authorised for this conversation is included.
+      const contextParts = [];
+      if (routing.mode === TEAM) {
+        if (settings.context) contextParts.push(`What this chat is about: ${settings.context}`);
+        if (chatName) contextParts.push(`Chat name: ${chatName}`);
+      } else {
+        if (settings.publicContext) contextParts.push(`What this chat is about: ${settings.publicContext}`);
+        if (chatName) contextParts.push(`Chat name: ${chatName}`);
+      }
+      const lead = leads?.get(chatId);
+      if (lead?.facts && Object.keys(lead.facts).length) {
+        contextParts.push(`What you already know about this person: ${JSON.stringify(lead.facts)}`);
+      }
+      if (fetched) contextParts.push(fetched);
+
+      const castRules = routing.mode === TEAM ? resolveCast({
+        speakerName: message.senderName,
+        speakerId: message.senderId,
+        text: message.text
+      }).rules : null;
+
+      const systemPrompt = buildPrompt({
+        mode: routing.mode,
+        knowledgeBlock: knowledge?.block || '',
+        contextBlock: contextParts.join('\n\n'),
+        castRules,
+        teamGroupIds: routing.internalGroupIds,
+        identityMode: config.identityMode
+      });
+
+      const messages = brain.buildMessages({ history, message, settings, systemPrompt, chatName, kind });
       const result = await runAgent({
         brain,
         tools,
-        toolSchemas: tools.selectSchemas(message.text),
+        toolSchemas: tools.selectSchemas(message.text, routing.mode),
         messages,
         context: {
           chatId,
@@ -343,6 +392,7 @@ function createHandler(deps) {
         persona: chat.persona || null,
         probability: chat.probability ?? null,
         context: chat.context || null,
+        publicContext: chat.publicContext || null,
         messages: (chat.messages || []).length,
         replies: (chat.replies || []).length,
         lastReplyAt: chat.lastReplyAt || null
@@ -391,7 +441,7 @@ function createHandler(deps) {
     } catch (error) {
       return json(res, 400, { error: error.message });
     }
-    const allowed = ['enabled', 'mode', 'persona', 'probability', 'name', 'contextMessages', 'context'];
+    const allowed = ['enabled', 'mode', 'persona', 'probability', 'name', 'contextMessages', 'context', 'publicContext'];
     const clean = {};
     for (const key of allowed) {
       if (patch[key] !== undefined) clean[key] = patch[key];

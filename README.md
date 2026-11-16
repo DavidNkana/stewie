@@ -166,6 +166,52 @@ curl -s -X POST -H "Authorization: Bearer $STEWIE_ADMIN_TOKEN" \
   http://127.0.0.1:8099/admin/groups/<group-id>
 ```
 
+## Modes, identity and knowledge
+
+### Modes
+
+Mode is decided on the server from verified provider metadata only:
+
+```js
+if (verified_event.is_group && verified_event.chat_id is in configured_internal_group_ids) mode = TEAM
+else mode = CLIENT
+```
+
+- `STEWIE_INTERNAL_GROUP_IDS` holds the exact internal group id(s). Currently one: the SafAi group.
+- Every other group, and every private message, is CLIENT mode.
+- Nothing written in a message can change the mode, including "I'm David" or a spoofed display name.
+- If the id is missing, everything falls back to CLIENT mode and the service logs a configuration warning.
+
+### Identity
+
+| `STEWIE_IDENTITY_MODE` | Client conversations |
+| --- | --- |
+| `persona` (default) | Talks as Alex, on the SAFAI team. Never mentions being an AI, a bot or a model. Never claims to be David |
+| `transparent` | Says plainly it is SAFAI's AI assistant if asked |
+
+The internal team group always knows what the assistant is, in either mode.
+
+### Knowledge
+
+`knowledge/safai.json` holds the approved public business facts: identity, founder, packages and published prices, timelines, payment terms, services, portfolio, contact details, and the rules about what must never be stated. It is server-side configuration, so a message can never rewrite a price.
+
+```sh
+curl -s -X POST -H "Authorization: Bearer $STEWIE_ADMIN_TOKEN" \
+  -H 'content-type: application/json' \
+  -d '{"publicContext":"Finance: tax notices, quotes, invoices and cash flow."}' \
+  http://127.0.0.1:8099/admin/groups/<group-id>
+```
+
+`context` is the note used in TEAM mode, `publicContext` the one used in CLIENT mode.
+
+### Client facts
+
+Known facts (name, business, project purpose, platforms, features, budget if supplied, timing, stage, consent) are stored per verified chat in `data/leads.json`, with a 90-day retention window. A phone number is never stored as a fact and never implies consent.
+
+### Actions
+
+There is no booking, CRM, invoice or handoff integration, so the assistant is instructed never to claim one happened. It offers the published contact details instead: **+27 74 777 8886** and **info@saf-ai.co.za**. The office landline is deliberately not offered.
+
 ## Personas
 
 A persona is the voice Stewie speaks with. It is just a prompt, so anything

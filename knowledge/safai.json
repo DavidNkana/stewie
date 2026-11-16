@@ -1,0 +1,162 @@
+{
+  "lastReviewed": "2026-11-16",
+  "identity": {
+    "legalName": "SAFAI (PTY) LTD",
+    "brandLine": "Apps built for Mzansi.",
+    "website": "https://www.saf-ai.co.za/",
+    "basedIn": "Centurion, South Africa",
+    "market": "South Africa",
+    "founder": "David Nkana",
+    "founderStatement": "SAFAI was founded by David Nkana.",
+    "model": "Venture studio: build, launch and operate.",
+    "plainLanguage": "We build mobile apps and web platforms for businesses and people with an idea they want to bring to life. We help with the design, development and launch, with ongoing support depending on the package.",
+    "whoWeServe": "Individuals, entrepreneurs, businesses, communities and organisations.",
+    "useCases": "Online sales, bookings, customer access, communities and simpler business operations. These are intended uses, not guaranteed revenue outcomes."
+  },
+  "contact": {
+    "email": "info@saf-ai.co.za",
+    "telephone": "012 683 8700",
+    "additionalNumber": "+27 74 777 8886",
+    "office": "Regus offices, Centurion Mall, Heuwel Rd, Centurion Central, Centurion, 0157, South Africa",
+    "officeHours": "Not specified. Arrange office visits through the team.",
+    "caveat": "Do not assume either number is WhatsApp-enabled without integration confirmation.",
+    "preferredForEnquiries": [
+      "+27 74 777 8886",
+      "info@saf-ai.co.za"
+    ],
+    "handoffRule": "When someone wants to talk to a person, give the preferred contact details: +27 74 777 8886 and info@saf-ai.co.za. Do not offer the office landline as the way to reach us."
+  },
+  "services": [
+    "Web, Android and iOS development, according to package",
+    "Product design, screen design, branding and user-experience work",
+    "Backend systems, authentication and payment integration",
+    "AI features appropriate to agreed scope",
+    "Ecommerce, marketplaces, community platforms, business tools, bookings and services",
+    "App-store submission assistance according to package",
+    "Ongoing support and operations under agreed terms",
+    "Enterprise engagements, dedicated teams, service-level agreements and longer-term roadmaps",
+    "Equity and revenue-sharing arrangements, evaluated by the team rather than automatically offered"
+  ],
+  "packages": [
+    {
+      "id": "starter",
+      "names": [
+        "Starter",
+        "Tab"
+      ],
+      "price": "R75,025",
+      "priceNote": "Package total in South African rand, including VAT. Not a monthly subscription.",
+      "platforms": [
+        "Web",
+        "Android"
+      ],
+      "timeline": "4-6 weeks",
+      "timelineNote": "Published indication, subject to scope, readiness and confirmed scheduling.",
+      "includes": [
+        "Up to 15 screens",
+        "Custom design system",
+        "Authentication, payments and full backend",
+        "Light AI integration",
+        "Play Store submission",
+        "Ongoing app support package"
+      ]
+    },
+    {
+      "id": "standard",
+      "names": [
+        "Standard",
+        "Full venture"
+      ],
+      "price": "R161,800",
+      "priceNote": "Package total in South African rand, including VAT. Not a monthly subscription.",
+      "platforms": [
+        "Web",
+        "iOS",
+        "Android"
+      ],
+      "timeline": "6-8 weeks",
+      "timelineNote": "Published indication, subject to scope, readiness and confirmed scheduling.",
+      "includes": [
+        "Unlimited screens + UX research",
+        "Bespoke brand and design system",
+        "Full-stack and AI-powered features",
+        "Build, launch and operate",
+        "Cloud and App Store / Play Store submission",
+        "Ongoing app support",
+        "Strategic partner and SLAs"
+      ]
+    },
+    {
+      "id": "enterprise",
+      "names": [
+        "Enterprise",
+        "Custom"
+      ],
+      "price": "Quoted individually",
+      "priceNote": "Quoted individually after scope is agreed with the team.",
+      "platforms": [
+        "Agreed scope"
+      ],
+      "timeline": "Agreed with the team",
+      "timelineNote": "No published timeline.",
+      "includes": [
+        "Dedicated cross-functional team",
+        "Multi-year roadmap and retainer",
+        "Custom SLAs, security and compliance",
+        "Equity and revenue-share options",
+        "Procurement and enterprise onboarding",
+        "Priority support and on-call"
+      ]
+    }
+  ],
+  "paymentTerms": "Payment is available over three months. Exact instalment amounts, deposit percentages and billing dates are not published, so do not state them.",
+  "portfolio": [
+    {
+      "name": "CAR FIND",
+      "description": "Automotive web marketplace in Zambia, supporting vehicle discovery, selling and listings.",
+      "discussionContext": "Marketplace and listing workflows"
+    },
+    {
+      "name": "AQEEQ YAMANI",
+      "description": "International luxury-ring ecommerce experience, with Arabic right-to-left presentation, product discovery and checkout.",
+      "discussionContext": "Ecommerce, multilingual and right-to-left experiences"
+    },
+    {
+      "name": "EVASALE",
+      "description": "South African ecommerce marketplace connecting shoppers and sellers.",
+      "discussionContext": "Shopping, payments and mobile commerce"
+    },
+    {
+      "name": "TIME-OUT HOME + STYLE",
+      "description": "Home, fashion and lifestyle ecommerce experience.",
+      "discussionContext": "Retail catalogues and checkout"
+    }
+  ],
+  "pricingRules": [
+    "If asked for prices, give them directly. Do not make someone complete discovery before revealing published information.",
+    "Starter does not include iOS. Do not imply that it does.",
+    "Treat timelines as published indications subject to scope, readiness and confirmed scheduling. Do not guarantee approval dates or invent a start date.",
+    "On unlimited screens, acknowledge the website wording and explain that workflows, integrations, revisions and delivery scope still need to be agreed in the proposal.",
+    "Support duration, fees, hosting allowances, third-party charges, source-code ownership, IP terms, warranties, cancellation and refund terms, and exact SLA coverage are not established. Get the team's confirmed terms rather than guessing.",
+    "Do not turn a published cloud or submission inclusion into a promise that every hosting bill, developer-account fee or third-party charge is included indefinitely.",
+    "No invented discounts, cheaper packages, finance approvals or guaranteed results.",
+    "Apple and Google make their own approval decisions. Never guarantee app-store approval."
+  ],
+  "designTool": {
+    "description": "The site's app designer explores a name, category, audience, visual style, intended outcome, screen structure and colours.",
+    "caveat": "An optional starting point, not a completed application or an approved technical specification. Do not force clients to answer all seven design steps in chat."
+  },
+  "testimonials": {
+    "note": "The site includes testimonials from Olia C. of Time-out Home and Style and Kgosi M., described as a product partner, and makes claims about value created and businesses served.",
+    "rule": "Do not treat those as independently verified statistics, do not invent additional testimonials, and do not promise similar results. Prefer concrete descriptions of work. If exact metrics are requested, ask the team for approved evidence."
+  },
+  "notEstablished": [
+    "Support duration and support fees",
+    "Hosting allowances and third-party charges",
+    "Source-code ownership and IP terms",
+    "Warranties",
+    "Cancellation and refund terms",
+    "Exact SLA coverage",
+    "Office hours, walk-in availability, meeting slots and response-time commitments"
+  ]
+}

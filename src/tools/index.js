@@ -11,7 +11,7 @@ const { searchHistory } = require('./history');
  * host's private network.
  */
 function createToolRegistry(deps) {
-  const { config, evolution, reminders, logger, directory, memory } = deps;
+  const { config, evolution, reminders, logger, directory, memory, leads } = deps;
 
   const definitions = [
     {
@@ -104,6 +104,29 @@ function createToolRegistry(deps) {
       }
     },
     {
+      name: 'record_client_facts',
+      description: 'Store what you have learned about this person so you do not ask again. Only store what they actually told you.',
+      parameters: {
+        type: 'object',
+        properties: {
+          name: { type: 'string', description: 'Their name, if they gave it' },
+          business: { type: 'string', description: 'Their business or organisation, if they gave it' },
+          projectPurpose: { type: 'string', description: 'What the app or project is meant to do, in their words' },
+          platforms: { type: 'string', description: 'Platforms they need, for example web and Android' },
+          requiredFeatures: { type: 'string', description: 'The main features they mentioned' },
+          budget: { type: 'string', description: 'Budget they stated, only if they stated one' },
+          desiredTiming: { type: 'string', description: 'Timing they mentioned, only if they mentioned one' },
+          currentStage: { type: 'string', description: 'Where they are: new enquiry, scoping, quoted, existing client' },
+          consentForNextStep: { type: 'string', description: 'Only if they agreed to a next step' }
+        }
+      },
+      execute: async (facts, context) => {
+        if (!leads) return { ok: true, result: { stored: false, note: 'no lead storage configured' } };
+        const saved = leads.record(context.chatId, facts);
+        return { stored: true, facts: saved.facts };
+      }
+    },
+    {
       name: 'list_chats',
       description: 'List the group chats and direct chats this account can talk in.',
       parameters: {
@@ -169,8 +192,23 @@ function createToolRegistry(deps) {
    * Handing the model the whole toolbox makes it explore (and loop) instead of
    * answering, and every extra round costs seconds in a chat.
    */
-  function selectSchemas(messageText) {
+  function selectSchemas(messageText, mode = 'CLIENT') {
     const text = String(messageText || '').toLowerCase();
+    if (mode === 'CLIENT') {
+      // Client conversations never get internal team tools.
+      return schemas.filter(schema => [
+        'fetch_url', 'read_pdf', 'calculate', 'create_reminder', 'list_reminders', 'record_client_facts'
+      ].includes(schema.function.name)).filter(schema => {
+        const name = schema.function.name;
+        if (name === 'fetch_url') return /https?:\/\//.test(text);
+        if (name === 'read_pdf') return /\.pdf\b|\bpdf\b/.test(text);
+        if (name === 'calculate') return /\b(calculate|compute|work out|how much|total|cost|price|per cent|%)\b|[0-9].*[+\-*/x]/.test(text);
+        if (name === 'create_reminder') return /\bremind\b|\breminder\b/.test(text);
+        if (name === 'list_reminders') return /\breminders?\b/.test(text);
+        if (name === 'record_client_facts') return /\b(my|our) (business|app|store|company|idea|project|budget|platforms?)\b/i.test(text);
+        return false;
+      });
+    }
     const wants = {
       fetch_url: /https?:\/\/|\bwebsite\b|\bpage\b|\barticle\b|\blink\b/.test(text),
       read_pdf: /\.pdf\b|\bpdf\b/.test(text),

@@ -5,6 +5,7 @@ const DEFAULT_SETTINGS = {
   enabled: true,
   contextMessages: null,
   context: null,
+  publicContext: null,
   personaUsed: null,
   mode: null,
   persona: null,
