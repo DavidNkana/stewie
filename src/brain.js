@@ -54,7 +54,21 @@ function buildSystemPrompt(input) {
  */
 function createBrain(config, fetchImpl = fetch) {
   /** Raw OpenAI-compatible chat completion. Returns text or null. */
-  async function chatCompletion(messages, { maxTokens = 400 } = {}) {
+  async function chatCompletion(messages, { maxTokens = 500 } = {}) {
+    // One retry: a provider hiccup must not silently drop a reply.
+    let lastError = null;
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      try {
+        return await chatCompletionOnce(messages, maxTokens);
+      } catch (error) {
+        lastError = error;
+        if (attempt === 2) break;
+      }
+    }
+    throw lastError;
+  }
+
+  async function chatCompletionOnce(messages, maxTokens) {
     const body = { model: config.model, messages };
     if (REASONING_MODEL.test(config.model)) {
       body.max_completion_tokens = maxTokens;

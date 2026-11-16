@@ -27,7 +27,7 @@ test('reasoning models omit temperature and use max_completion_tokens', async ()
   const answer = await brain.generate({ message: { text: 'hi' }, history: [], settings: {}, kind: 'dm' });
   assert.equal(answer, 'answer');
   assert.equal(captured.body.temperature, undefined);
-  assert.equal(captured.body.max_completion_tokens, 400);
+  assert.equal(captured.body.max_completion_tokens, 500);
   assert.equal(captured.url, 'https://api.test/v1/chat/completions');
 });
 
@@ -45,7 +45,7 @@ test('standard models send temperature and max_tokens', async () => {
   });
   await brain.generate({ message: { text: 'hi' }, history: [], settings: {}, kind: 'dm' });
   assert.equal(captured.temperature, 0.8);
-  assert.equal(captured.max_tokens, 400);
+  assert.equal(captured.max_tokens, 500);
 });
 
 test('reasoning blocks are stripped from the reply', async () => {

@@ -20,28 +20,40 @@ test('unknown people get no cast member', () => {
 test('the speaker rule is selected from the sender name', () => {
   const cast = resolveCast({ speakerName: 'Naazeem', text: 'hello' });
   assert.equal(cast.speaker.id, 'naazeem');
-  assert.match(cast.rules, /supreme leader/);
+  assert.match(cast.rules, /respectful and confident/);
 });
 
-test('zaakirah is called a worse version of you', () => {
+test('no hierarchy titles survive anywhere in the cast', () => {
+  const banned = ['supreme leader', 'second in command', 'worse version of you', 'qween mother'];
+  const names = ['Naazeem', 'David', 'Zaaki', 'Woody', 'Fatima', 'Sarah'];
+  for (const name of names) {
+    const rules = resolveCast({ speakerName: name, text: 'hi' }).rules.toLowerCase();
+    for (const phrase of banned) {
+      assert.ok(!rules.includes(phrase), `${name} still uses "${phrase}"`);
+    }
+  }
+});
+
+test('zaakirah gets playful bluntness without a nickname label', () => {
   const cast = resolveCast({ speakerName: 'Zaaki', text: 'hi' });
-  assert.match(cast.rules, /worse version of you/);
+  assert.match(cast.rules, /playful and blunt/);
 });
 
-test('dawood gets the bamboozle treatment', () => {
+test('dawood stays easy to tease', () => {
   const cast = resolveCast({ speakerName: 'Dawood', text: 'hi' });
-  assert.match(cast.rules, /Bamboozle/);
+  assert.match(cast.rules, /easy to tease/);
 });
 
 test('fatima is always treated nicely', () => {
   const cast = resolveCast({ speakerName: 'Fatima', text: 'hi' });
-  assert.match(cast.rules, /qween mother/);
-  assert.match(cast.rules, /Never rude/);
+  assert.match(cast.rules, /genuinely warm and kind/);
+  assert.match(cast.rules, /No sarcasm/);
 });
 
-test('david is the second in command', () => {
+test('david gets relaxed directness with no ceremony', () => {
   const cast = resolveCast({ speakerName: 'David', text: 'hi' });
-  assert.match(cast.rules, /second in command/);
+  assert.match(cast.rules, /relaxed and direct/);
+  assert.match(cast.rules, /No titles/);
 });
 
 test('someone named in the message also brings their rules', () => {
@@ -53,5 +65,5 @@ test('someone named in the message also brings their rules', () => {
 
 test('everyone else falls back to the default', () => {
   const cast = resolveCast({ speakerName: 'Sarah', text: 'morning' });
-  assert.match(cast.rules, /no special treatment/);
+  assert.match(cast.rules, /no special treatment/i);
 });
